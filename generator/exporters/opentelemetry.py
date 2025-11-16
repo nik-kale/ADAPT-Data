@@ -7,6 +7,13 @@ from typing import Any
 
 from generator.core.logging_config import get_logger
 
+try:
+    # Try to import opentelemetry (currently we don't use it, but check for future use)
+    import opentelemetry
+    OPENTELEMETRY_AVAILABLE = True
+except ImportError:
+    OPENTELEMETRY_AVAILABLE = False
+
 logger = get_logger(__name__)
 
 
@@ -23,6 +30,13 @@ class OpenTelemetryExporter:
         Args:
             dataset_dir: Directory containing ADAPT-Data dataset
         """
+        if not OPENTELEMETRY_AVAILABLE:
+            logger.info(
+                "opentelemetry package is not installed. "
+                "Basic OTLP format export will work, but advanced features may be limited. "
+                "Install with: pip install opentelemetry-api opentelemetry-sdk"
+            )
+
         self.dataset_dir = dataset_dir
 
     def export_traces(self, output_path: Path) -> None:

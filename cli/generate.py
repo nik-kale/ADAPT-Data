@@ -1,5 +1,6 @@
 """Generate incident command implementation."""
 
+import os
 import random
 import sys
 from datetime import datetime, timedelta
@@ -12,6 +13,7 @@ from pydantic import ValidationError
 
 from generator.core.base import IncidentContext
 from generator.core.config import AdaptDataConfig
+from generator.core.difficulty import DifficultyLevel, get_difficulty_config
 from generator.core.logging_config import get_logger
 from generator.core.progress import get_progress_tracker
 from generator.core.topology import TopologyGenerator
@@ -76,6 +78,7 @@ def generate_incident(
     output_dir: Path,
     duration: str,
     severity: str,
+    difficulty: Optional[str] = None,
     global_config: Optional[AdaptDataConfig] = None
 ) -> int:
     """Generate incident dataset.
@@ -85,6 +88,7 @@ def generate_incident(
         output_dir: Output directory
         duration: Duration string (e.g., "1h")
         severity: Severity level
+        difficulty: Difficulty level (beginner, easy, medium, hard, expert)
         global_config: Global ADAPT-Data configuration
 
     Returns:
@@ -146,9 +150,42 @@ def generate_incident(
             try:
                 # Ensure output_dir is created safely
                 output_dir_abs = output_dir.resolve()
+
+                # Check if parent directory exists and is writable
+                if not output_dir_abs.parent.exists():
+                    logger.error(f"Parent directory does not exist: {output_dir_abs.parent}")
+                    logger.error("Please create the parent directory first or choose a different output location")
+                    return 1
+
+                if not os.access(output_dir_abs.parent, os.W_OK):
+                    logger.error(f"No write permission for parent directory: {output_dir_abs.parent}")
+                    logger.error("Please check directory permissions or choose a different output location")
+                    return 1
+
+                # Create directory
                 output_dir_abs.mkdir(parents=True, exist_ok=True)
+
+                # Verify we can actually write to it
+                if not os.access(output_dir_abs, os.W_OK):
+                    logger.error(f"Cannot write to output directory: {output_dir_abs}")
+                    logger.error("Please check directory permissions")
+                    return 1
+
+                # Check available disk space (at least 100MB recommended)
+                import shutil
+                stat = shutil.disk_usage(output_dir_abs)
+                free_mb = stat.free / (1024 * 1024)
+                if free_mb < 100:
+                    logger.warning(f"Low disk space: {free_mb:.1f}MB available")
+                    logger.warning("Dataset generation may fail if disk space runs out")
+                elif free_mb < 10:
+                    logger.error(f"Insufficient disk space: {free_mb:.1f}MB available")
+                    logger.error("At least 100MB of free space is recommended")
+                    return 1
+
             except (OSError, RuntimeError) as e:
                 logger.error(f"Cannot create output directory {output_dir}: {e}")
+                logger.error("Common causes: insufficient permissions, invalid path, or disk full")
                 return 1
 
             # Create incident context
@@ -159,6 +196,19 @@ def generate_incident(
                 output_dir=output_dir_abs,
                 scenario_config=scenario_config
             )
+
+            # Apply difficulty configuration if provided
+            if difficulty:
+                difficulty_level = DifficultyLevel.from_string(difficulty)
+                difficulty_config = get_difficulty_config(difficulty_level)
+
+                logger.info(f"Applying difficulty level: {difficulty}")
+                logger.info(f"  Services: {difficulty_config.num_services}")
+                logger.info(f"  Noise level: {difficulty_config.noise_level}")
+                logger.info(f"  Correlation strength: {difficulty_config.correlation_strength}")
+
+                # Store difficulty config in context for generators to use
+                context.difficulty_config = difficulty_config
 
         # Generate topology
         with tracker.track("Generating topology", total=1):
@@ -187,11 +237,53 @@ def generate_incident(
         with tracker.track(f"Generating {generator_type} incident", total=1):
             result = generator.generate()
 
+        # Validate output if configured
+        if global_config and global_config.validation.validate_on_generation:
+            with tracker.track("Validating output data", total=1):
+                logger.info("Running output validation...")
+                validation_results = generator.validate_output()
+
+                # Log summary
+                summary = validation_results["summary"]
+                if summary["validation_passed"]:
+                    logger.info(f"✓ Validation passed: {summary['files_validated']} files validated")
+                else:
+                    logger.warning(f"⚠ Validation found {summary['total_errors']} errors")
+
+                # Log errors
+                if validation_results["errors"]:
+                    logger.error("Validation errors:")
+                    for error in validation_results["errors"]:
+                        logger.error(f"  - {error}")
+
+                # Log warnings (only first 5 to avoid spam)
+                if validation_results["warnings"]:
+                    logger.warning(f"Validation warnings ({len(validation_results['warnings'])} total):")
+                    for warning in validation_results["warnings"][:5]:
+                        logger.warning(f"  - {warning}")
+                    if len(validation_results["warnings"]) > 5:
+                        logger.warning(f"  ... and {len(validation_results['warnings']) - 5} more")
+
+                # Log info (only first 3)
+                if global_config.logging.level == "DEBUG" and validation_results["info"]:
+                    logger.debug(f"Validation info ({len(validation_results['info'])} total):")
+                    for info in validation_results["info"][:3]:
+                        logger.debug(f"  - {info}")
+
+                # Save validation report
+                validation_report_path = output_dir_abs / "validation_report.json"
+                import json
+                with open(validation_report_path, 'w') as f:
+                    json.dump(validation_results, f, indent=2)
+                logger.info(f"  Validation report saved to: {validation_report_path}")
+
         logger.info(f"✓ Successfully generated incident: {result['incident_id']}")
         logger.info(f"  Output directory: {output_dir}")
         logger.info(f"  Incident type: {result['incident_type']}")
         logger.info(f"  Duration: {duration}")
         logger.info(f"  Severity: {severity}")
+        if difficulty:
+            logger.info(f"  Difficulty: {difficulty}")
 
         return 0
 

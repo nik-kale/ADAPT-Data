@@ -1,0 +1,46 @@
+# ADAPT-Data Configuration File
+# This file customizes ADAPT-Data behavior for your environment
+
+# Logging configuration
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR
+  enable_colors: true
+  # log_file: adapt-data.log  # Uncomment to enable file logging
+
+# Default generation settings
+generation:
+  default_duration: 1h  # Default incident duration (e.g., 30m, 1h, 2h, 24h)
+  default_severity: SEV3  # Default severity level (SEV1-SEV4)
+  default_output_dir: ./output  # Default output directory
+  enable_progress: true  # Show progress bars during generation
+  parallel_generation: false  # Enable parallel generation (experimental)
+  # random_seed: 42  # Uncomment for reproducible generation
+
+# Validation settings
+validation:
+  strict_mode: false  # Enable strict validation (fails on warnings)
+  max_scenario_size_mb: 1  # Maximum scenario file size in MB
+  validate_on_generation: true  # Validate output after generation
+
+# Export settings
+export:
+  default_format: opentelemetry  # Default export format (opentelemetry, prometheus, or plugin name)
+  prometheus_port: 9090  # Default Prometheus server port
+  replay_speed: 1.0  # Default replay speed multiplier
+
+# Advanced settings
+advanced:
+  enable_distributions: true  # Use parameterized probability distributions
+  enable_patterns: true  # Apply time-series patterns (daily, weekly, etc.)
+  enable_correlation: true  # Generate correlated anomalies across services
+  noise_level: 0.1  # Base noise level for realistic variance (0.0-1.0)
+
+# Plugin settings (optional)
+# plugins:
+#   directory: ~/.adapt-data/plugins  # Custom plugin directory
+#   auto_discover: true  # Automatically discover plugins on startup
+
+# Difficulty settings (optional)
+# difficulty:
+#   default_level: MEDIUM  # Default difficulty level for challenges
+#   enable_scoring: true  # Enable challenge scoring system

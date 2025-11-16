@@ -245,3 +245,152 @@ def info(dataset_dir: Path) -> int:
     logger.info(f"Total size: {total_size / 1024 / 1024:.2f} MB")
 
     return 0
+
+
+def init_project(project_path: Path, force: bool = False) -> int:
+    """Initialize a new ADAPT-Data project.
+
+    Creates the project structure with:
+    - .adapt-data.yaml configuration file
+    - scenarios/ directory
+    - output/ directory
+    - plugins/ directory
+    - Example scenario file
+
+    Args:
+        project_path: Path to project directory
+        force: Overwrite existing files
+
+    Returns:
+        Exit code (0 = success, 1 = error)
+    """
+    # Convert to absolute path
+    project_path = project_path.resolve()
+
+    logger.info(f"Initializing ADAPT-Data project at: {project_path}")
+    logger.info("")
+
+    # Create project directory if it doesn't exist
+    if not project_path.exists():
+        try:
+            project_path.mkdir(parents=True, exist_ok=True)
+            logger.info(f"✓ Created project directory: {project_path}")
+        except Exception as e:
+            logger.error(f"Failed to create project directory: {e}")
+            return 1
+    else:
+        logger.info(f"✓ Using existing directory: {project_path}")
+
+    # Check if .adapt-data.yaml already exists
+    config_file = project_path / ".adapt-data.yaml"
+    if config_file.exists() and not force:
+        logger.info(f"  .adapt-data.yaml already exists (use --force to overwrite)")
+    else:
+        # Copy default config from ADAPT-Data installation
+        source_config = Path(__file__).parent.parent / ".adapt-data.yaml"
+        if source_config.exists():
+            try:
+                shutil.copy2(source_config, config_file)
+                logger.info(f"✓ Created .adapt-data.yaml")
+            except Exception as e:
+                logger.error(f"Failed to create config file: {e}")
+                return 1
+        else:
+            logger.warning(f"Source config not found at {source_config}")
+
+    # Create directories
+    directories = ["scenarios", "output", "plugins"]
+    for dir_name in directories:
+        dir_path = project_path / dir_name
+        if not dir_path.exists():
+            try:
+                dir_path.mkdir(parents=True, exist_ok=True)
+                logger.info(f"✓ Created {dir_name}/ directory")
+            except Exception as e:
+                logger.error(f"Failed to create {dir_name}/ directory: {e}")
+                return 1
+        else:
+            logger.info(f"  {dir_name}/ directory already exists")
+
+    # Create example scenario file
+    example_scenario = project_path / "scenarios" / "example_latency.yaml"
+    if example_scenario.exists() and not force:
+        logger.info(f"  example_latency.yaml already exists (use --force to overwrite)")
+    else:
+        example_content = """type: latency_regression
+description: Example latency regression scenario - Database query slowdown
+
+parameters:
+  affected_service: api-service
+  baseline_latency_ms: 50.0
+  degraded_latency_ms: 500.0
+  error_threshold_ms: 1000.0
+
+metadata:
+  category: performance
+  common_causes:
+    - Inefficient database query
+    - Missing database index
+    - N+1 query problem
+    - Increased data volume
+  detection_signals:
+    - p95 latency spike
+    - Slow query logs
+    - Database CPU increase
+  mitigation_strategies:
+    - Rollback deployment
+    - Add database index
+    - Optimize query
+    - Scale database
+"""
+        try:
+            with open(example_scenario, 'w') as f:
+                f.write(example_content)
+            logger.info(f"✓ Created example scenario: scenarios/example_latency.yaml")
+        except Exception as e:
+            logger.error(f"Failed to create example scenario: {e}")
+            return 1
+
+    # Create README in plugins directory
+    plugins_readme = project_path / "plugins" / "README.md"
+    if not plugins_readme.exists() or force:
+        readme_content = """# Custom Plugins
+
+Place your custom ADAPT-Data plugins in this directory.
+
+## Plugin Types
+
+- **Generators**: Custom incident scenario generators
+- **Exporters**: Custom export format handlers
+- **Analyzers**: Custom dataset analysis tools
+
+## Structure
+
+```
+plugins/
+├── my_generator.py
+├── my_exporter.py
+└── my_analyzer.py
+```
+
+See the ADAPT-Data documentation for plugin development guide.
+"""
+        try:
+            with open(plugins_readme, 'w') as f:
+                f.write(readme_content)
+            logger.info(f"✓ Created plugins/README.md")
+        except Exception as e:
+            logger.warning(f"Failed to create plugins README: {e}")
+
+    # Success message with next steps
+    logger.info("")
+    logger.info("✓ Project initialization complete!")
+    logger.info("")
+    logger.info("Next steps:")
+    logger.info("  1. Edit .adapt-data.yaml to customize configuration")
+    logger.info("  2. Review the example scenario: scenarios/example_latency.yaml")
+    logger.info("  3. Generate your first dataset:")
+    logger.info(f"     adapt-data generate --scenario example_latency --output {project_path}/output")
+    logger.info("")
+
+    return 0

@@ -11,8 +11,8 @@ from generator.core.config import get_config
 from generator.core.plugins import get_plugin_registry
 
 
-def main() -> int:
-    """Main CLI entry point."""
+def _main_impl() -> int:
+    """Main CLI implementation."""
     # Load configuration early
     config = get_config()
 
@@ -322,6 +322,23 @@ def main() -> int:
         return 0
     else:
         parser.print_help()
+        return 1
+
+
+def main() -> int:
+    """Main CLI entry point with error handling."""
+    try:
+        return _main_impl()
+    except KeyboardInterrupt:
+        from generator.core.logging_config import get_logger
+        logger = get_logger(__name__)
+        logger.info("\nOperation cancelled by user")
+        return 130
+    except Exception as e:
+        from generator.core.logging_config import get_logger
+        logger = get_logger(__name__)
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        logger.error("Please report this issue at: https://github.com/yourusername/ADAPT-Data/issues")
         return 1
 
 

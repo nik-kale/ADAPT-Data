@@ -83,7 +83,7 @@ class ConfigDriftConfig(BaseModel):
 class PacketLossConfig(BaseModel):
     """Configuration for packet loss incidents."""
 
-    affected_services: list[str] = Field(..., min_items=1, max_items=20)
+    affected_services: list[str] = Field(..., min_length=1, max_length=20)
     packet_loss_percent: float = Field(..., gt=0.0, le=100.0)
 
 
@@ -107,8 +107,8 @@ class CascadeIncidentSpec(BaseModel):
         "bursty_noise"
     ]
     service: str = Field(..., min_length=1, max_length=100)
-    delay: str = Field("0m", regex=r'^\d+[smhd]$')
-    duration: str = Field("10m", regex=r'^\d+[smhd]$')
+    delay: str = Field("0m", pattern=r'^\d+[smhd]$')
+    duration: str = Field("10m", pattern=r'^\d+[smhd]$')
     severity: Optional[Literal["SEV1", "SEV2", "SEV3", "SEV4"]] = None
     parameters: Optional[dict[str, Any]] = None
 
@@ -116,7 +116,7 @@ class CascadeIncidentSpec(BaseModel):
 class CascadeConfig(BaseModel):
     """Configuration for cascade incidents."""
 
-    cascade_config: list[CascadeIncidentSpec] = Field(..., min_items=2, max_items=10)
+    cascade_config: list[CascadeIncidentSpec] = Field(..., min_length=2, max_length=10)
 
 
 class ScenarioConfig(BaseModel):
@@ -170,7 +170,7 @@ class GenerationConfig(BaseModel):
 
     scenario: str = Field(..., min_length=1, max_length=500)
     output_dir: Path
-    duration: str = Field(..., regex=r'^\d+[smhd]$')
+    duration: str = Field(..., pattern=r'^\d+[smhd]$')
     severity: Literal["SEV1", "SEV2", "SEV3", "SEV4"]
 
     @validator('scenario')

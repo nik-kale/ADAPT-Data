@@ -31,8 +31,8 @@ class PrometheusExporter:
             dataset_dir: Directory containing ADAPT-Data dataset
         """
         if not PROMETHEUS_AVAILABLE:
-            raise ImportError(
-                "prometheus_client is required for Prometheus export. "
+            logger.warning(
+                "prometheus_client is not installed. Prometheus export features will not be available. "
                 "Install with: pip install prometheus-client"
             )
 
@@ -50,6 +50,13 @@ class PrometheusExporter:
             ValueError: If metrics directory not found or no metrics to serve
             IOError: If file operations fail
         """
+        if not PROMETHEUS_AVAILABLE:
+            logger.error(
+                "Cannot serve metrics: prometheus_client is not installed. "
+                "Install with: pip install prometheus-client"
+            )
+            return
+
         logger.info(f"Starting Prometheus metrics server on port {port}...")
         logger.info(f"Replay speed: {replay_speed}x")
         logger.info(f"Metrics endpoint: http://localhost:{port}/metrics")
@@ -206,6 +213,12 @@ class PrometheusExporter:
             ValueError: If metrics directory not found or no metrics to export
             IOError: If file operations fail
         """
+        if not PROMETHEUS_AVAILABLE:
+            logger.warning(
+                "prometheus_client is not installed, but text format export doesn't require it. "
+                "Proceeding with export..."
+            )
+
         metrics_dir = self.dataset_dir / "metrics"
         if not metrics_dir.exists():
             logger.error(f"Metrics directory not found: {metrics_dir}")

@@ -116,16 +116,13 @@ class LatencyRegressionGenerator(BaseGenerator):
             spike_duration=self.context.duration
         )
 
-        # Generate logs over time
-        current_time = self.context.start_time - timedelta(minutes=30)
-        end_time = self.context.end_time + timedelta(minutes=30)
-
-        while current_time < end_time:
+        # Generate logs over time using helper
+        for current_time in self._iterate_time_window(step=timedelta(seconds=1)):
             # Request frequency: varies with business hours pattern
             for host in hosts:
                 base_rate = 0.1  # Base 10% of time slots
                 request_rate = self.request_rate_pattern.apply(base_rate, current_time)
-                if random.random() < request_rate:
+                if self._should_generate_log(request_rate):
                     latency = injector.get_latency(current_time)
                     is_error = latency > self.error_threshold_ms
 
@@ -163,8 +160,6 @@ class LatencyRegressionGenerator(BaseGenerator):
 
                     logs.append(log_entry)
 
-            current_time += timedelta(seconds=1)
-
         return logs
 
     def _generate_metrics(self) -> list[dict[str, Any]]:
@@ -180,11 +175,8 @@ class LatencyRegressionGenerator(BaseGenerator):
             spike_duration=self.context.duration
         )
 
-        # Generate metrics over time
-        current_time = self.context.start_time - timedelta(minutes=30)
-        end_time = self.context.end_time + timedelta(minutes=30)
-
-        while current_time < end_time:
+        # Generate metrics over time using helper
+        for current_time in self._iterate_time_window(step=timedelta(minutes=1)):
             for host in hosts:
                 latency = injector.get_latency(current_time)
                 is_anomaly = self.context.is_during_incident(current_time)
@@ -239,8 +231,6 @@ class LatencyRegressionGenerator(BaseGenerator):
                         "tags": {"query": "orders_by_user"},
                         "anomaly_injected": True
                     })
-
-            current_time += timedelta(minutes=1)
 
         return metrics
 
