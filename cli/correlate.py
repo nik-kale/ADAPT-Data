@@ -281,52 +281,52 @@ def print_correlation_report(results: dict[str, Any]) -> None:
     Args:
         results: Correlation analysis results
     """
-    print("\n" + "=" * 70)
-    print("CORRELATION ANALYSIS REPORT")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("CORRELATION ANALYSIS REPORT")
+    logger.info("=" * 70)
 
     # Metric correlations
     if "metric_correlations" in results:
         mc = results["metric_correlations"]
-        print(f"\n📊 METRIC CORRELATIONS:")
-        print(f"  Pairs Analyzed: {mc.get('total_pairs_analyzed', 0)}")
-        print(f"  Significant Correlations: {mc.get('significant_correlations', 0)}")
+        logger.info(f"\n📊 METRIC CORRELATIONS:")
+        logger.info(f"  Pairs Analyzed: {mc.get('total_pairs_analyzed', 0)}")
+        logger.info(f"  Significant Correlations: {mc.get('significant_correlations', 0)}")
 
         if mc.get("top_correlations"):
-            print(f"\n  Top Correlations:")
+            logger.info(f"\n  Top Correlations:")
             for corr in mc["top_correlations"][:5]:
                 sign = "+" if corr["correlation"] > 0 else ""
-                print(f"    {corr['metric1']} ↔ {corr['metric2']}")
-                print(f"      Correlation: {sign}{corr['correlation']:.3f} ({corr['strength']})")
+                logger.info(f"    {corr['metric1']} ↔ {corr['metric2']}")
+                logger.info(f"      Correlation: {sign}{corr['correlation']:.3f} ({corr['strength']})")
 
     # Temporal patterns
     if "temporal_correlations" in results:
         tc = results["temporal_correlations"]
-        print(f"\n📈 TEMPORAL PATTERNS:")
-        print(f"  Metrics Analyzed: {tc.get('metrics_analyzed', 0)}")
+        logger.info(f"\n📈 TEMPORAL PATTERNS:")
+        logger.info(f"  Metrics Analyzed: {tc.get('metrics_analyzed', 0)}")
 
         if tc.get("patterns_detected"):
-            print(f"  Patterns Detected:")
+            logger.info(f"  Patterns Detected:")
             for pattern in tc["patterns_detected"][:5]:
-                print(f"    {pattern['metric']}: {pattern['direction']} trend "
+                logger.info(f"    {pattern['metric']}: {pattern['direction']} trend "
                       f"(strength: {pattern['strength']:.2f})")
 
     # Service correlations
     if "service_correlations" in results:
         sc = results["service_correlations"]
-        print(f"\n🔧 SERVICE ERROR RATES:")
+        logger.info(f"\n🔧 SERVICE ERROR RATES:")
 
         if sc.get("service_error_rates"):
             for svc in sc["service_error_rates"][:5]:
-                print(f"    {svc['service']}: {svc['error_rate']:.1%} "
+                logger.info(f"    {svc['service']}: {svc['error_rate']:.1%} "
                       f"({svc['errors']}/{svc['total_logs']} logs)")
 
     # Anomaly correlations
     if "anomaly_correlations" in results:
         ac = results["anomaly_correlations"]
-        print(f"\n⚠️  ANOMALY CORRELATIONS:")
-        print(f"  Error Windows: {ac.get('error_windows', 0)}")
-        print(f"  Correlated Metric Anomalies: {ac.get('correlated_metric_anomalies', 0)}")
-        print(f"  Correlation Rate: {ac.get('correlation_rate', 0):.1%}")
+        logger.info(f"\n⚠️  ANOMALY CORRELATIONS:")
+        logger.info(f"  Error Windows: {ac.get('error_windows', 0)}")
+        logger.info(f"  Correlated Metric Anomalies: {ac.get('correlated_metric_anomalies', 0)}")
+        logger.info(f"  Correlation Rate: {ac.get('correlation_rate', 0):.1%}")
 
-    print("\n" + "=" * 70 + "\n")
+    logger.info("\n" + "=" * 70 + "\n")

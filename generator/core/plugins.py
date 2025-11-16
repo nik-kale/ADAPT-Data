@@ -4,7 +4,7 @@ This module provides a simple plugin framework for extending ADAPT-Data
 with custom generators, exporters, and analyzers.
 """
 
-import importlib
+import importlib.util
 import inspect
 from abc import ABC, abstractmethod
 from pathlib import Path

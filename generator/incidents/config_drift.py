@@ -5,11 +5,29 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from generator.core.base import BaseGenerator, IncidentContext
+from generator.core.distributions import (
+    UniformDistribution,
+    NormalDistribution
+)
+from generator.core.patterns import (
+    create_daily_pattern,
+    NoisePattern
+)
 from generator.core.logging_config import get_logger
 from generator.core.timeline import TimelineGenerator
 from generator.core.utils import timestamp_to_iso, generate_uuid
 
 logger = get_logger(__name__)
+
+# Distributions for realistic data generation
+_POOL_UTILIZATION_INCIDENT = UniformDistribution(min_val=0.85, max_val=1.0)
+_POOL_UTILIZATION_NORMAL = UniformDistribution(min_val=0.3, max_val=0.6)
+_QUEUE_DEPTH_INCIDENT = UniformDistribution(min_val=10, max_val=50)
+_QUEUE_DEPTH_NORMAL = UniformDistribution(min_val=0, max_val=5)
+_REQUEST_DURATION_INCIDENT = UniformDistribution(min_val=800, max_val=1500)
+_REQUEST_DURATION_NORMAL = UniformDistribution(min_val=150, max_val=250)
+_TRANSACTION_DURATION = UniformDistribution(min_val=100, max_val=300)
+_WAITING_REQUESTS = UniformDistribution(min_val=5, max_val=50)
 
 
 class ConfigDriftGenerator(BaseGenerator):
@@ -44,6 +62,11 @@ class ConfigDriftGenerator(BaseGenerator):
 
         context.affected_services = [affected_service]
         context.root_cause = f"Configuration change: {config_key} reduced from {old_value} to {new_value}"
+
+        # Time-series patterns for realistic data
+        self.utilization_noise = NoisePattern(noise_level=0.08)
+        self.queue_noise = NoisePattern(noise_level=0.15)
+        self.latency_noise = NoisePattern(noise_level=0.10)
 
     def generate(self) -> dict[str, Any]:
         """Generate complete incident dataset."""
@@ -103,7 +126,7 @@ class ConfigDriftGenerator(BaseGenerator):
                             "message": random.choice(error_messages),
                             "metadata": {
                                 "current_pool_size": self.new_value,
-                                "waiting_requests": random.randint(5, 50),
+                                "waiting_requests": int(_WAITING_REQUESTS.sample()),
                                 "request_id": generate_uuid()
                             }
                         })
@@ -115,7 +138,7 @@ class ConfigDriftGenerator(BaseGenerator):
                             "host": host,
                             "message": "Transaction completed successfully",
                             "metadata": {
-                                "duration_ms": random.uniform(100, 300),
+                                "duration_ms": _TRANSACTION_DURATION.sample(),
                                 "request_id": generate_uuid()
                             }
                         })
@@ -152,7 +175,7 @@ class ConfigDriftGenerator(BaseGenerator):
                     {
                         "timestamp": timestamp_to_iso(current_time),
                         "metric_name": "transaction_pool_utilization",
-                        "value": random.uniform(0.85, 1.0) if is_during_incident else random.uniform(0.3, 0.6),
+                        "value": self.utilization_noise.apply(_POOL_UTILIZATION_INCIDENT.sample(), current_time) if is_during_incident else self.utilization_noise.apply(_POOL_UTILIZATION_NORMAL.sample(), current_time),
                         "service": self.affected_service,
                         "metric_type": "gauge",
                         "unit": "ratio",
@@ -163,7 +186,7 @@ class ConfigDriftGenerator(BaseGenerator):
                     {
                         "timestamp": timestamp_to_iso(current_time),
                         "metric_name": "transaction_queue_depth",
-                        "value": random.randint(10, 50) if is_during_incident else random.randint(0, 5),
+                        "value": int(self.queue_noise.apply(_QUEUE_DEPTH_INCIDENT.sample(), current_time)) if is_during_incident else int(self.queue_noise.apply(_QUEUE_DEPTH_NORMAL.sample(), current_time)),
                         "service": self.affected_service,
                         "metric_type": "gauge",
                         "unit": "requests",
@@ -174,7 +197,7 @@ class ConfigDriftGenerator(BaseGenerator):
                     {
                         "timestamp": timestamp_to_iso(current_time),
                         "metric_name": "http_request_duration_p95",
-                        "value": random.uniform(800, 1500) if is_during_incident else random.uniform(150, 250),
+                        "value": self.latency_noise.apply(_REQUEST_DURATION_INCIDENT.sample(), current_time) if is_during_incident else self.latency_noise.apply(_REQUEST_DURATION_NORMAL.sample(), current_time),
                         "service": self.affected_service,
                         "metric_type": "gauge",
                         "unit": "ms",
@@ -199,7 +222,7 @@ class ConfigDriftGenerator(BaseGenerator):
             is_during_incident = self.context.is_during_incident(trace_time)
 
             trace_id = generate_uuid()
-            duration = random.uniform(800, 1500) if is_during_incident else random.uniform(150, 250)
+            duration = _REQUEST_DURATION_INCIDENT.sample() if is_during_incident else _REQUEST_DURATION_NORMAL.sample()
 
             traces.append({
                 "trace_id": trace_id,

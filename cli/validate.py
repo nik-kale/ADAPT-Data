@@ -7,6 +7,10 @@ from typing import Any
 
 import jsonschema
 
+from generator.core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 def load_schema(schema_name: str) -> dict[str, Any]:
     """Load JSON schema.
@@ -47,12 +51,12 @@ def validate_jsonl_file(file_path: Path, schema: dict[str, Any], strict: bool) -
                 jsonschema.validate(instance=record, schema=schema)
             except json.JSONDecodeError as e:
                 errors += 1
-                print(f"  ✗ Line {line_num}: Invalid JSON - {e}")
+                logger.error(f"  ✗ Line {line_num}: Invalid JSON - {e}")
                 if strict:
                     raise
             except jsonschema.ValidationError as e:
                 errors += 1
-                print(f"  ✗ Line {line_num}: Schema validation failed - {e.message}")
+                logger.error(f"  ✗ Line {line_num}: Schema validation failed - {e.message}")
                 if strict:
                     raise
 
@@ -76,12 +80,12 @@ def validate_json_file(file_path: Path, schema: dict[str, Any], strict: bool) ->
         jsonschema.validate(instance=data, schema=schema)
         return True
     except json.JSONDecodeError as e:
-        print(f"  ✗ Invalid JSON - {e}")
+        logger.error(f"  ✗ Invalid JSON - {e}")
         if strict:
             raise
         return False
     except jsonschema.ValidationError as e:
-        print(f"  ✗ Schema validation failed - {e.message}")
+        logger.error(f"  ✗ Schema validation failed - {e.message}")
         if strict:
             raise
         return False
@@ -98,94 +102,94 @@ def validate_dataset(dataset_dir: Path, strict: bool = False) -> int:
         Exit code
     """
     if not dataset_dir.exists():
-        print(f"Error: Dataset directory not found: {dataset_dir}")
+        logger.error(f"Dataset directory not found: {dataset_dir}")
         return 1
 
-    print(f"Validating dataset: {dataset_dir}\n")
+    logger.info(f"Validating dataset: {dataset_dir}\n")
 
     total_errors = 0
 
     # Validate logs
     logs_dir = dataset_dir / "logs"
     if logs_dir.exists():
-        print("Validating logs...")
+        logger.info("Validating logs...")
         log_schema = load_schema("log_schema.json")
         for log_file in logs_dir.glob("*.jsonl"):
             total, errors = validate_jsonl_file(log_file, log_schema, strict)
             if errors == 0:
-                print(f"  ✓ {log_file.name}: {total} records valid")
+                logger.info(f"  ✓ {log_file.name}: {total} records valid")
             else:
-                print(f"  ✗ {log_file.name}: {errors}/{total} records invalid")
+                logger.error(f"  ✗ {log_file.name}: {errors}/{total} records invalid")
                 total_errors += errors
 
     # Validate metrics
     metrics_dir = dataset_dir / "metrics"
     if metrics_dir.exists():
-        print("\nValidating metrics...")
+        logger.info("\nValidating metrics...")
         metric_schema = load_schema("metric_schema.json")
         for metric_file in metrics_dir.glob("*.jsonl"):
             total, errors = validate_jsonl_file(metric_file, metric_schema, strict)
             if errors == 0:
-                print(f"  ✓ {metric_file.name}: {total} records valid")
+                logger.info(f"  ✓ {metric_file.name}: {total} records valid")
             else:
-                print(f"  ✗ {metric_file.name}: {errors}/{total} records invalid")
+                logger.error(f"  ✗ {metric_file.name}: {errors}/{total} records invalid")
                 total_errors += errors
 
     # Validate traces
     traces_dir = dataset_dir / "traces"
     if traces_dir.exists():
-        print("\nValidating traces...")
+        logger.info("\nValidating traces...")
         trace_schema = load_schema("trace_schema.json")
         for trace_file in traces_dir.glob("*.jsonl"):
             total, errors = validate_jsonl_file(trace_file, trace_schema, strict)
             if errors == 0:
-                print(f"  ✓ {trace_file.name}: {total} records valid")
+                logger.info(f"  ✓ {trace_file.name}: {total} records valid")
             else:
-                print(f"  ✗ {trace_file.name}: {errors}/{total} records invalid")
+                logger.error(f"  ✗ {trace_file.name}: {errors}/{total} records invalid")
                 total_errors += errors
 
     # Validate config deltas
     config_dir = dataset_dir / "config_deltas"
     if config_dir.exists():
-        print("\nValidating config deltas...")
+        logger.info("\nValidating config deltas...")
         config_schema = load_schema("config_delta_schema.json")
         for config_file in config_dir.glob("*.jsonl"):
             total, errors = validate_jsonl_file(config_file, config_schema, strict)
             if errors == 0:
-                print(f"  ✓ {config_file.name}: {total} records valid")
+                logger.info(f"  ✓ {config_file.name}: {total} records valid")
             else:
-                print(f"  ✗ {config_file.name}: {errors}/{total} records invalid")
+                logger.error(f"  ✗ {config_file.name}: {errors}/{total} records invalid")
                 total_errors += errors
 
     # Validate timelines
     timelines_dir = dataset_dir / "timelines"
     if timelines_dir.exists():
-        print("\nValidating timelines...")
+        logger.info("\nValidating timelines...")
         timeline_schema = load_schema("timeline_schema.json")
         for timeline_file in timelines_dir.glob("*.json"):
             if validate_json_file(timeline_file, timeline_schema, strict):
-                print(f"  ✓ {timeline_file.name}: valid")
+                logger.info(f"  ✓ {timeline_file.name}: valid")
             else:
-                print(f"  ✗ {timeline_file.name}: invalid")
+                logger.error(f"  ✗ {timeline_file.name}: invalid")
                 total_errors += 1
 
     # Validate topology
     topology_dir = dataset_dir / "topology"
     if topology_dir.exists():
-        print("\nValidating topology...")
+        logger.info("\nValidating topology...")
         topology_schema = load_schema("topology_schema.json")
         for topology_file in topology_dir.glob("*.json"):
             if validate_json_file(topology_file, topology_schema, strict):
-                print(f"  ✓ {topology_file.name}: valid")
+                logger.info(f"  ✓ {topology_file.name}: valid")
             else:
-                print(f"  ✗ {topology_file.name}: invalid")
+                logger.error(f"  ✗ {topology_file.name}: invalid")
                 total_errors += 1
 
     # Summary
-    print(f"\n{'='*60}")
+    logger.info(f"\n{'='*60}")
     if total_errors == 0:
-        print("✓ All files validated successfully!")
+        logger.info("✓ All files validated successfully!")
         return 0
     else:
-        print(f"✗ Validation failed with {total_errors} error(s)")
+        logger.error(f"✗ Validation failed with {total_errors} error(s)")
         return 1

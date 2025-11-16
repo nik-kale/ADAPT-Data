@@ -6,6 +6,10 @@ from typing import Any
 
 import yaml
 
+from generator.core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 def run_wizard() -> dict[str, Any]:
     """Run interactive wizard to create scenario configuration.
@@ -13,15 +17,15 @@ def run_wizard() -> dict[str, Any]:
     Returns:
         Scenario configuration dictionary
     """
-    print("=" * 70)
-    print("ADAPT-Data Configuration Wizard")
-    print("=" * 70)
-    print("\nThis wizard will help you create a custom incident scenario.\n")
+    logger.info("=" * 70)
+    logger.info("ADAPT-Data Configuration Wizard")
+    logger.info("=" * 70)
+    logger.info("\nThis wizard will help you create a custom incident scenario.\n")
 
     config: dict[str, Any] = {}
 
     # Choose incident type
-    print("Available incident types:")
+    logger.info("Available incident types:")
     types = [
         ("latency_regression", "Performance degradation from slow queries/code"),
         ("auth_failure", "Authentication service failures"),
@@ -32,7 +36,7 @@ def run_wizard() -> dict[str, Any]:
     ]
 
     for i, (name, desc) in enumerate(types, 1):
-        print(f"  {i}. {name}: {desc}")
+        logger.info(f"  {i}. {name}: {desc}")
 
     while True:
         choice = input("\nSelect incident type (1-6): ").strip()
@@ -43,7 +47,7 @@ def run_wizard() -> dict[str, Any]:
                 break
         except ValueError:
             pass
-        print("Invalid choice. Please enter a number 1-6.")
+        logger.error("Invalid choice. Please enter a number 1-6.")
 
     # Get description
     config["description"] = input("\nIncident description: ").strip() or "Custom incident scenario"
@@ -52,37 +56,37 @@ def run_wizard() -> dict[str, Any]:
     config["parameters"] = {}
 
     if config["type"] == "latency_regression":
-        print("\n--- Latency Regression Parameters ---")
+        logger.info("\n--- Latency Regression Parameters ---")
         config["parameters"]["affected_service"] = input("Affected service (default: order-service): ").strip() or "order-service"
         config["parameters"]["baseline_latency_ms"] = float(input("Baseline latency in ms (default: 50): ") or "50")
         config["parameters"]["degraded_latency_ms"] = float(input("Degraded latency in ms (default: 500): ") or "500")
 
     elif config["type"] == "auth_failure":
-        print("\n--- Auth Failure Parameters ---")
+        logger.info("\n--- Auth Failure Parameters ---")
         config["parameters"]["affected_service"] = input("Affected service (default: auth-service): ").strip() or "auth-service"
         config["parameters"]["spike_error_rate"] = float(input("Error rate during spike 0-1 (default: 0.25): ") or "0.25")
 
     elif config["type"] == "dependency_outage":
-        print("\n--- Dependency Outage Parameters ---")
+        logger.info("\n--- Dependency Outage Parameters ---")
         config["parameters"]["failed_service"] = input("Failed service (default: postgres-primary): ").strip() or "postgres-primary"
 
     elif config["type"] == "config_drift":
-        print("\n--- Config Drift Parameters ---")
+        logger.info("\n--- Config Drift Parameters ---")
         config["parameters"]["affected_service"] = input("Affected service (default: payment-service): ").strip() or "payment-service"
         config["parameters"]["config_key"] = input("Config key changed: ").strip() or "max_connections"
         config["parameters"]["old_value"] = int(input("Old value: ") or "100")
         config["parameters"]["new_value"] = int(input("New value: ") or "10")
 
     elif config["type"] == "packet_loss":
-        print("\n--- Packet Loss Parameters ---")
+        logger.info("\n--- Packet Loss Parameters ---")
         config["parameters"]["packet_loss_percent"] = float(input("Packet loss percentage (default: 15): ") or "15")
 
     elif config["type"] == "bursty_noise":
-        print("\n--- Bursty Noise Parameters ---")
+        logger.info("\n--- Bursty Noise Parameters ---")
         config["parameters"]["affected_service"] = input("Affected service (default: user-service): ").strip() or "user-service"
 
     # Metadata
-    print("\n--- Additional Configuration ---")
+    logger.info("\n--- Additional Configuration ---")
 
     difficulty = input("Difficulty level (easy/medium/hard, default: medium): ").strip() or "medium"
 
@@ -95,7 +99,7 @@ def run_wizard() -> dict[str, Any]:
     }
 
     # Save location
-    print("\n--- Save Scenario ---")
+    logger.info("\n--- Save Scenario ---")
     scenario_name = input("Scenario name (e.g., my_custom_incident): ").strip()
     if not scenario_name:
         scenario_name = f"custom_{config['type']}"
@@ -103,9 +107,9 @@ def run_wizard() -> dict[str, Any]:
     output_path = Path("scenarios") / f"{scenario_name}.yaml"
 
     # Confirm
-    print(f"\nScenario will be saved to: {output_path}")
-    print("\nConfiguration:")
-    print(yaml.dump(config, default_flow_style=False))
+    logger.info(f"\nScenario will be saved to: {output_path}")
+    logger.info("\nConfiguration:")
+    logger.info(yaml.dump(config, default_flow_style=False))
 
     confirm = input("\nSave this configuration? (y/n): ").strip().lower()
 
@@ -114,13 +118,13 @@ def run_wizard() -> dict[str, Any]:
         with open(output_path, 'w') as f:
             yaml.dump(config, f, default_flow_style=False)
 
-        print(f"\n✓ Scenario saved to: {output_path}")
-        print(f"\nTo generate this incident:")
-        print(f"  python -m cli.main generate --scenario {scenario_name} --output ./output")
+        logger.info(f"\n✓ Scenario saved to: {output_path}")
+        logger.info(f"\nTo generate this incident:")
+        logger.info(f"  python -m cli.main generate --scenario {scenario_name} --output ./output")
 
         return config
     else:
-        print("\nConfiguration not saved.")
+        logger.info("\nConfiguration not saved.")
         return {}
 
 

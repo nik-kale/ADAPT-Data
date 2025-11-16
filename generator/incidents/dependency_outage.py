@@ -5,11 +5,26 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from generator.core.base import BaseGenerator, IncidentContext
+from generator.core.distributions import (
+    UniformDistribution,
+    ExponentialDistribution,
+    LogNormalDistribution
+)
+from generator.core.patterns import (
+    create_daily_pattern,
+    NoisePattern
+)
 from generator.core.logging_config import get_logger
 from generator.core.timeline import TimelineGenerator
 from generator.core.utils import timestamp_to_iso, generate_uuid
 
 logger = get_logger(__name__)
+
+# Distributions for realistic data generation
+_RETRY_COUNT_DIST = UniformDistribution(min_val=1, max_val=10)
+_NORMAL_DURATION_DIST = UniformDistribution(min_val=20, max_val=60)  # Normal request duration in ms
+_CONNECTION_POOL_DIST = UniformDistribution(min_val=10, max_val=50)  # Active connections
+_HTTP_REQUESTS_DIST = UniformDistribution(min_val=80, max_val=120)  # Requests per interval
 
 
 class DependencyOutageGenerator(BaseGenerator):
@@ -42,6 +57,11 @@ class DependencyOutageGenerator(BaseGenerator):
 
         context.affected_services = [failed_service] + self.dependent_services
         context.root_cause = f"Complete outage of {failed_service} causing cascading failures"
+
+        # Time-series patterns for realistic data
+        self.request_pattern = create_daily_pattern(amplitude=0.25)
+        self.connection_pattern = create_daily_pattern(amplitude=0.20)
+        self.metric_noise = NoisePattern(noise_level=0.05)
 
     def generate(self) -> dict[str, Any]:
         """Generate complete incident dataset."""
@@ -92,7 +112,7 @@ class DependencyOutageGenerator(BaseGenerator):
                     "message": "Database connection lost - attempting reconnection",
                     "metadata": {
                         "error": "connection_refused",
-                        "retry_attempt": random.randint(1, 10)
+                        "retry_attempt": int(_RETRY_COUNT_DIST.sample())
                     }
                 })
 
@@ -128,7 +148,7 @@ class DependencyOutageGenerator(BaseGenerator):
                                 "host": host,
                                 "message": "Request processed successfully",
                                 "metadata": {
-                                    "duration_ms": random.uniform(20, 60),
+                                    "duration_ms": round(_NORMAL_DURATION_DIST.sample(), 2),
                                     "request_id": generate_uuid()
                                 }
                             })
@@ -163,7 +183,7 @@ class DependencyOutageGenerator(BaseGenerator):
                 {
                     "timestamp": timestamp_to_iso(current_time),
                     "metric_name": "connection_pool_active",
-                    "value": 0 if is_during_outage else random.randint(10, 50),
+                    "value": 0 if is_during_outage else int(self.connection_pattern.apply(_CONNECTION_POOL_DIST.sample(), current_time)),
                     "service": self.failed_service,
                     "metric_type": "gauge",
                     "unit": "connections",
@@ -180,7 +200,7 @@ class DependencyOutageGenerator(BaseGenerator):
                         {
                             "timestamp": timestamp_to_iso(current_time),
                             "metric_name": "http_requests_total",
-                            "value": random.randint(80, 120),
+                            "value": int(self.request_pattern.apply(_HTTP_REQUESTS_DIST.sample(), current_time)),
                             "service": service,
                             "metric_type": "counter",
                             "unit": "requests",
@@ -191,7 +211,7 @@ class DependencyOutageGenerator(BaseGenerator):
                         {
                             "timestamp": timestamp_to_iso(current_time),
                             "metric_name": "http_error_rate",
-                            "value": 0.95 if is_during_outage else 0.001,
+                            "value": 0.95 if is_during_outage else self.metric_noise.apply(0.001, current_time),
                             "service": service,
                             "metric_type": "gauge",
                             "unit": "ratio",

@@ -5,11 +5,33 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from generator.core.base import BaseGenerator, IncidentContext
+from generator.core.distributions import (
+    UniformDistribution,
+    NormalDistribution,
+    ExponentialDistribution
+)
+from generator.core.patterns import (
+    create_daily_pattern,
+    NoisePattern
+)
 from generator.core.logging_config import get_logger
 from generator.core.timeline import TimelineGenerator
 from generator.core.utils import timestamp_to_iso, generate_uuid
 
 logger = get_logger(__name__)
+
+# Distributions for realistic data generation
+_PACKET_SIZE_DIST = UniformDistribution(min_val=64, max_val=1500)  # Bytes
+_JITTER_DIST = NormalDistribution(mean=0, std=5)  # ms
+_RTT_DIST = UniformDistribution(min_val=10, max_val=50)  # Round-trip time
+_RETRY_COUNT_DIST = UniformDistribution(min_val=1, max_val=3)  # Retry attempts
+_DURATION_MS_DIST = UniformDistribution(min_val=40, max_val=80)  # Successful request duration
+_RETRANSMIT_RATE_NORMAL_DIST = UniformDistribution(min_val=0, max_val=1)  # Normal retransmit rate
+_RETRANSMIT_RATE_INCIDENT_DIST = UniformDistribution(min_val=5, max_val=15)  # Incident retransmit rate
+_TIMEOUT_RATE_NORMAL_DIST = UniformDistribution(min_val=0, max_val=0.01)  # Normal timeout rate
+_TIMEOUT_RATE_INCIDENT_DIST = UniformDistribution(min_val=0.08, max_val=0.15)  # Incident timeout rate
+_LATENCY_NORMAL_DIST = UniformDistribution(min_val=50, max_val=100)  # Normal latency p95
+_LATENCY_INCIDENT_DIST = UniformDistribution(min_val=800, max_val=2000)  # Incident latency p95
 
 
 class PacketLossGenerator(BaseGenerator):
@@ -38,6 +60,11 @@ class PacketLossGenerator(BaseGenerator):
 
         context.affected_services = self.affected_services
         context.root_cause = f"Network degradation causing {packet_loss_percent}% packet loss between services"
+
+        # Time-series patterns for realistic data
+        self.network_noise = NoisePattern(noise_level=0.12)
+        self.retransmit_noise = NoisePattern(noise_level=0.10)
+        self.latency_noise = NoisePattern(noise_level=0.15)
 
     def generate(self) -> dict[str, Any]:
         """Generate complete incident dataset."""
@@ -97,7 +124,7 @@ class PacketLossGenerator(BaseGenerator):
                                 "message": random.choice(error_messages),
                                 "metadata": {
                                     "error_code": "NETWORK_TIMEOUT",
-                                    "retry_count": random.randint(1, 3),
+                                    "retry_count": int(_RETRY_COUNT_DIST.sample()),
                                     "request_id": generate_uuid()
                                 }
                             })
@@ -109,7 +136,7 @@ class PacketLossGenerator(BaseGenerator):
                                 "host": host,
                                 "message": "Request completed successfully",
                                 "metadata": {
-                                    "duration_ms": random.uniform(40, 80),
+                                    "duration_ms": _DURATION_MS_DIST.sample(),
                                     "request_id": generate_uuid()
                                 }
                             })
@@ -132,14 +159,17 @@ class PacketLossGenerator(BaseGenerator):
                 hosts = self._get_service_hosts(service)
                 for host in hosts:
                     # Network metrics
+                    packet_loss_dist_incident = UniformDistribution(
+                        min_val=self.packet_loss_percent * 0.8,
+                        max_val=self.packet_loss_percent * 1.2
+                    )
+                    packet_loss_dist_normal = UniformDistribution(min_val=0.0, max_val=0.5)
+
                     metrics.extend([
                         {
                             "timestamp": timestamp_to_iso(current_time),
                             "metric_name": "network_packet_loss_percent",
-                            "value": random.uniform(
-                                self.packet_loss_percent * 0.8,
-                                self.packet_loss_percent * 1.2
-                            ) if is_during_incident else random.uniform(0.0, 0.5),
+                            "value": self.network_noise.apply(packet_loss_dist_incident.sample(), current_time) if is_during_incident else self.network_noise.apply(packet_loss_dist_normal.sample(), current_time),
                             "service": service,
                             "metric_type": "gauge",
                             "unit": "percent",
@@ -150,7 +180,7 @@ class PacketLossGenerator(BaseGenerator):
                         {
                             "timestamp": timestamp_to_iso(current_time),
                             "metric_name": "network_retransmit_rate",
-                            "value": random.uniform(5, 15) if is_during_incident else random.uniform(0, 1),
+                            "value": self.retransmit_noise.apply(_RETRANSMIT_RATE_INCIDENT_DIST.sample(), current_time) if is_during_incident else self.retransmit_noise.apply(_RETRANSMIT_RATE_NORMAL_DIST.sample(), current_time),
                             "service": service,
                             "metric_type": "gauge",
                             "unit": "percent",
@@ -161,7 +191,7 @@ class PacketLossGenerator(BaseGenerator):
                         {
                             "timestamp": timestamp_to_iso(current_time),
                             "metric_name": "http_request_timeout_rate",
-                            "value": random.uniform(0.08, 0.15) if is_during_incident else random.uniform(0, 0.01),
+                            "value": _TIMEOUT_RATE_INCIDENT_DIST.sample() if is_during_incident else _TIMEOUT_RATE_NORMAL_DIST.sample(),
                             "service": service,
                             "metric_type": "gauge",
                             "unit": "ratio",
@@ -172,7 +202,7 @@ class PacketLossGenerator(BaseGenerator):
                         {
                             "timestamp": timestamp_to_iso(current_time),
                             "metric_name": "http_request_duration_p95",
-                            "value": random.uniform(800, 2000) if is_during_incident else random.uniform(50, 100),
+                            "value": self.latency_noise.apply(_LATENCY_INCIDENT_DIST.sample(), current_time) if is_during_incident else self.latency_noise.apply(_LATENCY_NORMAL_DIST.sample(), current_time),
                             "service": service,
                             "metric_type": "gauge",
                             "unit": "ms",

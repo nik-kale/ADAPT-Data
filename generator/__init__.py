@@ -1,6 +1,6 @@
 """ADAPT-Data: Synthetic Telemetry & Incident Dataset Generator."""
 
-__version__ = "0.1.0"
+__version__ = "0.4.0"
 __author__ = "ADAPT Team"
 __description__ = "Synthetic dataset generator for cloud incident simulation"
 

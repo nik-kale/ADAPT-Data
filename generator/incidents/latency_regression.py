@@ -5,12 +5,27 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from generator.core.base import BaseGenerator, IncidentContext
+from generator.core.distributions import (
+    UniformDistribution,
+    LogNormalDistribution,
+    CPU_DISTRIBUTION,
+    MEMORY_DISTRIBUTION
+)
+from generator.core.patterns import (
+    create_business_hours_pattern,
+    create_daily_pattern,
+    NoisePattern
+)
 from generator.core.logging_config import get_logger
 from generator.core.timeline import TimelineGenerator
 from generator.core.utils import timestamp_to_iso, generate_uuid
 from generator.anomalies.injectors import LatencyInjector
 
 logger = get_logger(__name__)
+
+# Distributions for realistic data generation
+_ORDER_ID_DIST = UniformDistribution(min_val=1000, max_val=9999)
+_ROWS_EXAMINED_DIST = LogNormalDistribution(mu=9, sigma=1)  # ~8K-100K rows
 
 
 class LatencyRegressionGenerator(BaseGenerator):
@@ -42,6 +57,10 @@ class LatencyRegressionGenerator(BaseGenerator):
         self.baseline_latency_ms = baseline_latency_ms
         self.degraded_latency_ms = degraded_latency_ms
         self.error_threshold_ms = error_threshold_ms
+
+        # Time-series patterns for realistic data
+        self.request_rate_pattern = create_business_hours_pattern()
+        self.latency_noise = NoisePattern(noise_level=0.05)
 
         # Update context
         context.affected_services = [affected_service]
@@ -102,18 +121,21 @@ class LatencyRegressionGenerator(BaseGenerator):
         end_time = self.context.end_time + timedelta(minutes=30)
 
         while current_time < end_time:
-            # Request frequency: ~10 requests per second per host
+            # Request frequency: varies with business hours pattern
             for host in hosts:
-                if random.random() < 0.1:  # 10% of time slots
+                base_rate = 0.1  # Base 10% of time slots
+                request_rate = self.request_rate_pattern.apply(base_rate, current_time)
+                if random.random() < request_rate:
                     latency = injector.get_latency(current_time)
                     is_error = latency > self.error_threshold_ms
 
+                    order_id = int(_ORDER_ID_DIST.sample())
                     log_entry = {
                         "timestamp": timestamp_to_iso(current_time),
                         "level": "ERROR" if is_error else "INFO",
                         "service": self.affected_service,
                         "host": host,
-                        "message": f"HTTP GET /api/orders/{random.randint(1000, 9999)}",
+                        "message": f"HTTP GET /api/orders/{order_id}",
                         "metadata": {
                             "endpoint": "/api/orders/{id}",
                             "method": "GET",
@@ -125,6 +147,7 @@ class LatencyRegressionGenerator(BaseGenerator):
 
                     # Add slow query warnings during incident
                     if self.context.is_during_incident(current_time) and latency > 200:
+                        rows_examined = int(_ROWS_EXAMINED_DIST.sample())
                         logs.append({
                             "timestamp": timestamp_to_iso(current_time),
                             "level": "WARN",
@@ -134,7 +157,7 @@ class LatencyRegressionGenerator(BaseGenerator):
                             "metadata": {
                                 "query": "SELECT * FROM orders WHERE user_id = ? AND status IN (...)",
                                 "duration_ms": round(latency * 0.8, 2),
-                                "rows_examined": random.randint(10000, 100000)
+                                "rows_examined": max(10000, min(100000, rows_examined))
                             }
                         })
 
@@ -171,7 +194,7 @@ class LatencyRegressionGenerator(BaseGenerator):
                     {
                         "timestamp": timestamp_to_iso(current_time),
                         "metric_name": "http_request_duration_p50",
-                        "value": round(latency * 0.7, 2),
+                        "value": round(self.latency_noise.apply(latency * 0.7, current_time), 2),
                         "service": self.affected_service,
                         "metric_type": "gauge",
                         "unit": "ms",
@@ -182,7 +205,7 @@ class LatencyRegressionGenerator(BaseGenerator):
                     {
                         "timestamp": timestamp_to_iso(current_time),
                         "metric_name": "http_request_duration_p95",
-                        "value": round(latency, 2),
+                        "value": round(self.latency_noise.apply(latency, current_time), 2),
                         "service": self.affected_service,
                         "metric_type": "gauge",
                         "unit": "ms",
@@ -193,7 +216,7 @@ class LatencyRegressionGenerator(BaseGenerator):
                     {
                         "timestamp": timestamp_to_iso(current_time),
                         "metric_name": "http_request_duration_p99",
-                        "value": round(latency * 1.3, 2),
+                        "value": round(self.latency_noise.apply(latency * 1.3, current_time), 2),
                         "service": self.affected_service,
                         "metric_type": "gauge",
                         "unit": "ms",
@@ -208,7 +231,7 @@ class LatencyRegressionGenerator(BaseGenerator):
                     metrics.append({
                         "timestamp": timestamp_to_iso(current_time),
                         "metric_name": "db_query_duration_ms",
-                        "value": round(latency * 0.8, 2),
+                        "value": round(self.latency_noise.apply(latency * 0.8, current_time), 2),
                         "service": self.affected_service,
                         "metric_type": "gauge",
                         "unit": "ms",
@@ -251,7 +274,7 @@ class LatencyRegressionGenerator(BaseGenerator):
                         "service": "api-gateway",
                         "operation": "HTTP GET /api/orders/123",
                         "start_time": timestamp_to_iso(trace_time),
-                        "duration_ms": round(latency + 10, 2),
+                        "duration_ms": round(self.latency_noise.apply(latency + 10, trace_time), 2),
                         "status": "OK",
                         "tags": {"http.method": "GET", "http.path": "/api/orders/123"}
                     },
@@ -261,7 +284,7 @@ class LatencyRegressionGenerator(BaseGenerator):
                         "service": self.affected_service,
                         "operation": "getOrder",
                         "start_time": timestamp_to_iso(trace_time + timedelta(milliseconds=2)),
-                        "duration_ms": round(latency, 2),
+                        "duration_ms": round(self.latency_noise.apply(latency, trace_time), 2),
                         "status": "OK" if latency < self.error_threshold_ms else "ERROR",
                         "tags": {"order_id": "123"}
                     },
@@ -271,7 +294,7 @@ class LatencyRegressionGenerator(BaseGenerator):
                         "service": "postgres-primary",
                         "operation": "SELECT orders",
                         "start_time": timestamp_to_iso(trace_time + timedelta(milliseconds=5)),
-                        "duration_ms": round(latency * 0.85, 2),
+                        "duration_ms": round(self.latency_noise.apply(latency * 0.85, trace_time), 2),
                         "status": "OK",
                         "tags": {"db.statement": "SELECT * FROM orders WHERE user_id = ?"}
                     }

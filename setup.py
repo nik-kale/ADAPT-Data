@@ -19,7 +19,7 @@ if requirements_path.exists():
 
 setup(
     name="adapt-data",
-    version="0.1.0",
+    version="0.4.0",
     author="ADAPT Team",
     description="Synthetic Telemetry & Incident Dataset Generator",
     long_description=long_description,

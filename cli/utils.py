@@ -30,9 +30,9 @@ def get_version() -> str:
 def print_version() -> None:
     """Print version information."""
     version = get_version()
-    print(f"ADAPT-Data version {version}")
-    print(f"Python {sys.version}")
-    print(f"Platform: {platform.platform()}")
+    logger.info(f"ADAPT-Data version {version}")
+    logger.info(f"Python {sys.version}")
+    logger.info(f"Platform: {platform.platform()}")
 
 
 def doctor(verbose: bool = False) -> int:
@@ -44,7 +44,8 @@ def doctor(verbose: bool = False) -> int:
     Returns:
         Exit code (0 = healthy, 1 = issues found)
     """
-    print("Running ADAPT-Data health checks...\n")
+    logger.info("Running ADAPT-Data health checks...")
+    logger.info("")
 
     issues = []
 
@@ -53,7 +54,7 @@ def doctor(verbose: bool = False) -> int:
     if py_version < (3, 10):
         issues.append(f"Python version {py_version.major}.{py_version.minor} is too old (requires >=3.10)")
     else:
-        print(f"✓ Python version: {py_version.major}.{py_version.minor}.{py_version.micro}")
+        logger.info(f"✓ Python version: {py_version.major}.{py_version.minor}.{py_version.micro}")
 
     # Check required dependencies
     required_deps = [
@@ -66,13 +67,14 @@ def doctor(verbose: bool = False) -> int:
     for module_name, package_name in required_deps:
         try:
             __import__(module_name)
-            print(f"✓ {package_name} installed")
+            logger.info(f"✓ {package_name} installed")
         except ImportError:
             issues.append(f"Required package '{package_name}' not installed")
 
     # Check optional dependencies
     if verbose:
-        print("\nOptional dependencies:")
+        logger.info("")
+        logger.info("Optional dependencies:")
         optional_deps = [
             ("prometheus_client", "prometheus-client"),
             ("kafka", "kafka-python"),
@@ -83,15 +85,15 @@ def doctor(verbose: bool = False) -> int:
         for module_name, package_name in optional_deps:
             try:
                 __import__(module_name)
-                print(f"  ✓ {package_name} installed")
+                logger.info(f"  ✓ {package_name} installed")
             except ImportError:
-                print(f"  ○ {package_name} not installed (optional)")
+                logger.info(f"  ○ {package_name} not installed (optional)")
 
     # Check schemas directory
     schema_dir = Path(__file__).parent.parent / "schema"
     if schema_dir.exists():
         schema_count = len(list(schema_dir.glob("*.json")))
-        print(f"✓ Found {schema_count} schema files")
+        logger.info(f"✓ Found {schema_count} schema files")
     else:
         issues.append("Schema directory not found")
 
@@ -99,19 +101,19 @@ def doctor(verbose: bool = False) -> int:
     scenarios_dir = Path(__file__).parent.parent / "scenarios"
     if scenarios_dir.exists():
         scenario_count = len(list(scenarios_dir.glob("*.yaml")))
-        print(f"✓ Found {scenario_count} scenario files")
+        logger.info(f"✓ Found {scenario_count} scenario files")
     else:
-        print("  ○ No scenarios directory (optional)")
+        logger.info("  ○ No scenarios directory (optional)")
 
     # Summary
-    print()
+    logger.info("")
     if issues:
-        print(f"✗ Found {len(issues)} issue(s):")
+        logger.error(f"✗ Found {len(issues)} issue(s):")
         for issue in issues:
-            print(f"  - {issue}")
+            logger.error(f"  - {issue}")
         return 1
     else:
-        print("✓ All checks passed!")
+        logger.info("✓ All checks passed!")
         return 0
 
 
@@ -159,26 +161,27 @@ def clean(
     total_size = sum(f.stat().st_size for f in files_to_delete if f.is_file())
 
     if not files_to_delete and not dirs_to_delete:
-        print("Nothing to clean")
+        logger.info("Nothing to clean")
         return 0
 
     # Show what will be deleted
-    print(f"Found {len(files_to_delete)} files and {len(dirs_to_delete)} directories to clean")
-    print(f"Total size: {total_size / 1024 / 1024:.2f} MB")
+    logger.info(f"Found {len(files_to_delete)} files and {len(dirs_to_delete)} directories to clean")
+    logger.info(f"Total size: {total_size / 1024 / 1024:.2f} MB")
 
     if dry_run:
-        print("\nDry run - would delete:")
+        logger.info("")
+        logger.info("Dry run - would delete:")
         for f in files_to_delete[:10]:  # Show first 10
-            print(f"  {f}")
+            logger.info(f"  {f}")
         if len(files_to_delete) > 10:
-            print(f"  ... and {len(files_to_delete) - 10} more")
+            logger.info(f"  ... and {len(files_to_delete) - 10} more")
         return 0
 
     # Confirm deletion
     if not force:
         response = input("\nProceed with deletion? [y/N]: ")
         if response.lower() != 'y':
-            print("Cancelled")
+            logger.info("Cancelled")
             return 0
 
     # Delete files
@@ -197,7 +200,8 @@ def clean(
         except Exception as e:
             logger.error(f"Error deleting {d}: {e}")
 
-    print(f"\n✓ Deleted {deleted_count} items")
+    logger.info("")
+    logger.info(f"✓ Deleted {deleted_count} items")
     return 0
 
 
@@ -214,8 +218,8 @@ def info(dataset_dir: Path) -> int:
         logger.error(f"Dataset directory not found: {dataset_dir}")
         return 1
 
-    print(f"Dataset: {dataset_dir}")
-    print()
+    logger.info(f"Dataset: {dataset_dir}")
+    logger.info("")
 
     # Count files by type
     subdirs = ["logs", "metrics", "traces", "config_deltas", "timelines", "topology"]
@@ -229,7 +233,7 @@ def info(dataset_dir: Path) -> int:
                 file_count = len(list(dir_path.glob("*.jsonl")))
 
             if file_count > 0:
-                print(f"  {subdir}: {file_count} file(s)")
+                logger.info(f"  {subdir}: {file_count} file(s)")
 
     # Total size
     total_size = sum(
@@ -237,6 +241,7 @@ def info(dataset_dir: Path) -> int:
         for f in dataset_dir.rglob("*")
         if f.is_file()
     )
-    print(f"\nTotal size: {total_size / 1024 / 1024:.2f} MB")
+    logger.info("")
+    logger.info(f"Total size: {total_size / 1024 / 1024:.2f} MB")
 
     return 0

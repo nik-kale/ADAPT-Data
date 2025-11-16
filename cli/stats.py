@@ -8,6 +8,10 @@ from typing import Any
 
 import numpy as np
 
+from generator.core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 def analyze_dataset(dataset_dir: Path) -> dict[str, Any]:
     """Analyze dataset and generate statistics.
@@ -211,53 +215,53 @@ def _analyze_timeline(timelines_dir: Path) -> dict[str, Any]:
 
 def print_stats(stats: dict[str, Any]) -> None:
     """Print statistics in human-readable format."""
-    print("\n" + "=" * 70)
-    print("DATASET STATISTICS")
-    print("=" * 70)
+    logger.info("\n" + "=" * 70)
+    logger.info("DATASET STATISTICS")
+    logger.info("=" * 70)
 
     # Logs
     if stats.get("logs"):
-        print("\n📝 LOGS:")
+        logger.info("\n📝 LOGS:")
         logs = stats["logs"]
-        print(f"  Total Entries: {logs['total_count']:,}")
-        print(f"  Log Levels:")
+        logger.info(f"  Total Entries: {logs['total_count']:,}")
+        logger.info(f"  Log Levels:")
         for level, count in sorted(logs['level_distribution'].items()):
             pct = count / logs['total_count'] * 100
-            print(f"    {level}: {count:,} ({pct:.1f}%)")
+            logger.info(f"    {level}: {count:,} ({pct:.1f}%)")
 
     # Metrics
     if stats.get("metrics"):
-        print("\n📊 METRICS:")
+        logger.info("\n📊 METRICS:")
         metrics = stats["metrics"]
-        print(f"  Total Data Points: {metrics['total_count']:,}")
-        print(f"  Unique Metrics: {metrics['unique_metrics']}")
-        print(f"  Anomalous Points: {metrics['anomalous_count']:,} ({metrics['anomalous_percentage']:.1f}%)")
+        logger.info(f"  Total Data Points: {metrics['total_count']:,}")
+        logger.info(f"  Unique Metrics: {metrics['unique_metrics']}")
+        logger.info(f"  Anomalous Points: {metrics['anomalous_count']:,} ({metrics['anomalous_percentage']:.1f}%)")
 
     # Traces
     if stats.get("traces"):
-        print("\n🔍 TRACES:")
+        logger.info("\n🔍 TRACES:")
         traces = stats["traces"]
-        print(f"  Total Traces: {traces['total_traces']:,}")
-        print(f"  Total Spans: {traces['total_spans']:,}")
-        print(f"  Avg Spans/Trace: {traces['avg_spans_per_trace']:.1f}")
+        logger.info(f"  Total Traces: {traces['total_traces']:,}")
+        logger.info(f"  Total Spans: {traces['total_spans']:,}")
+        logger.info(f"  Avg Spans/Trace: {traces['avg_spans_per_trace']:.1f}")
 
         if traces.get("duration_stats_ms"):
             dur = traces["duration_stats_ms"]
-            print(f"  Duration Stats (ms):")
-            print(f"    Mean: {dur['mean']:.2f}")
-            print(f"    p95: {dur['p95']:.2f}")
-            print(f"    p99: {dur['p99']:.2f}")
+            logger.info(f"  Duration Stats (ms):")
+            logger.info(f"    Mean: {dur['mean']:.2f}")
+            logger.info(f"    p95: {dur['p95']:.2f}")
+            logger.info(f"    p99: {dur['p99']:.2f}")
 
     # Timeline
     if stats.get("timeline"):
-        print("\n📅 TIMELINE:")
+        logger.info("\n📅 TIMELINE:")
         timeline = stats["timeline"]
-        print(f"  Incident ID: {timeline.get('incident_id')}")
-        print(f"  Severity: {timeline.get('severity')}")
-        print(f"  Root Cause: {timeline.get('root_cause')}")
-        print(f"  Total Events: {timeline.get('total_events')}")
+        logger.info(f"  Incident ID: {timeline.get('incident_id')}")
+        logger.info(f"  Severity: {timeline.get('severity')}")
+        logger.info(f"  Root Cause: {timeline.get('root_cause')}")
+        logger.info(f"  Total Events: {timeline.get('total_events')}")
 
-    print("\n" + "=" * 70 + "\n")
+    logger.info("\n" + "=" * 70 + "\n")
 
 
 def export_stats(stats: dict[str, Any], output_path: Path) -> None:
@@ -265,4 +269,4 @@ def export_stats(stats: dict[str, Any], output_path: Path) -> None:
     with open(output_path, 'w') as f:
         json.dump(stats, f, indent=2, default=str)
 
-    print(f"Statistics exported to: {output_path}")
+    logger.info(f"Statistics exported to: {output_path}")

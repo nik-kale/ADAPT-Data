@@ -1,9 +1,8 @@
 # Core dependencies
 pyyaml>=6.0
 jsonschema>=4.17.0
-
-# Optional dependencies for advanced features
 numpy>=1.24.0  # For statistical distributions
+pydantic>=2.0.0  # For input validation
 
 # Development dependencies (install with: pip install -e ".[dev]")
 # pytest>=7.0

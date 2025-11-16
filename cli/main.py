@@ -7,10 +7,18 @@ from pathlib import Path
 
 from cli.generate import generate_incident
 from cli.validate import validate_dataset
+from generator.core.config import get_config
+from generator.core.plugins import get_plugin_registry
 
 
 def main() -> int:
     """Main CLI entry point."""
+    # Load configuration early
+    config = get_config()
+
+    # Load plugins early
+    plugin_registry = get_plugin_registry()
+
     parser = argparse.ArgumentParser(
         description="ADAPT-Data: Synthetic Telemetry & Incident Dataset Generator",
         formatter_class=argparse.RawDescriptionHelpFormatter
@@ -30,19 +38,19 @@ def main() -> int:
     )
     gen_parser.add_argument(
         "--output",
-        default="./output",
-        help="Output directory (default: ./output)"
+        default=config.generation.default_output_dir,
+        help=f"Output directory (default: {config.generation.default_output_dir})"
     )
     gen_parser.add_argument(
         "--duration",
-        default="1h",
-        help="Incident duration (e.g., 30m, 1h, 2h)"
+        default=config.generation.default_duration,
+        help=f"Incident duration (default: {config.generation.default_duration})"
     )
     gen_parser.add_argument(
         "--severity",
         choices=["SEV1", "SEV2", "SEV3", "SEV4"],
-        default="SEV3",
-        help="Incident severity"
+        default=config.generation.default_severity,
+        help=f"Incident severity (default: {config.generation.default_severity})"
     )
 
     # Validate command
@@ -57,7 +65,8 @@ def main() -> int:
     val_parser.add_argument(
         "--strict",
         action="store_true",
-        help="Enable strict validation mode"
+        default=config.validation.strict_mode,
+        help=f"Enable strict validation mode (default: {config.validation.strict_mode})"
     )
 
     # List scenarios command
@@ -97,9 +106,8 @@ def main() -> int:
     )
     export_parser.add_argument(
         "--format",
-        choices=["opentelemetry", "prometheus"],
-        required=True,
-        help="Export format"
+        default=config.export.default_format,
+        help=f"Export format: opentelemetry, prometheus, or plugin name (default: {config.export.default_format})"
     )
     export_parser.add_argument(
         "--output",
@@ -119,14 +127,14 @@ def main() -> int:
     serve_parser.add_argument(
         "--port",
         type=int,
-        default=9090,
-        help="HTTP port (default: 9090)"
+        default=config.export.prometheus_port,
+        help=f"HTTP port (default: {config.export.prometheus_port})"
     )
     serve_parser.add_argument(
         "--replay-speed",
         type=float,
-        default=1.0,
-        help="Replay speed multiplier (default: 1.0)"
+        default=config.export.replay_speed,
+        help=f"Replay speed multiplier (default: {config.export.replay_speed})"
     )
 
     # Version command
@@ -190,6 +198,12 @@ def main() -> int:
         help="Export results to JSON file"
     )
 
+    # List plugins command
+    list_plugins_parser = subparsers.add_parser(
+        "list-plugins",
+        help="List available plugins"
+    )
+
     args = parser.parse_args()
 
     if args.command == "generate":
@@ -197,7 +211,8 @@ def main() -> int:
             scenario=args.scenario,
             output_dir=Path(args.output),
             duration=args.duration,
-            severity=args.severity
+            severity=args.severity,
+            global_config=config
         )
     elif args.command == "validate":
         return validate_dataset(
@@ -220,7 +235,12 @@ def main() -> int:
         run_wizard()
         return 0
     elif args.command == "export":
+        from generator.core.logging_config import get_logger
+        logger = get_logger(__name__)
+
         dataset_dir = Path(args.dataset_dir)
+
+        # Try built-in exporters first
         if args.format == "opentelemetry":
             from generator.exporters.opentelemetry import OpenTelemetryExporter
             exporter = OpenTelemetryExporter(dataset_dir)
@@ -232,6 +252,16 @@ def main() -> int:
             from generator.exporters.prometheus import PrometheusExporter
             exporter = PrometheusExporter(dataset_dir)
             exporter.export_text_format(Path(args.output))
+        else:
+            # Try plugin exporters
+            plugin_exporter = plugin_registry.get_exporter(args.format)
+            if plugin_exporter:
+                logger.info(f"Using plugin exporter: {args.format}")
+                plugin_exporter.export(dataset_dir, Path(args.output))
+            else:
+                logger.error(f"Unknown export format: {args.format}")
+                logger.info("Available formats: opentelemetry, prometheus, or custom plugin exporters")
+                return 1
         return 0
     elif args.command == "serve":
         from generator.exporters.prometheus import PrometheusExporter
@@ -260,6 +290,35 @@ def main() -> int:
             with open(args.output, 'w') as f:
                 json.dump(results, f, indent=2)
             print(f"Results exported to: {args.output}")
+        return 0
+    elif args.command == "list-plugins":
+        from generator.core.logging_config import get_logger
+        logger = get_logger(__name__)
+
+        plugins = plugin_registry.list_plugins()
+
+        logger.info("=== ADAPT-Data Plugins ===")
+        logger.info(f"\nGenerators ({len(plugins['generators'])}):")
+        for name in plugins['generators']:
+            gen = plugin_registry.get_generator(name)
+            if gen:
+                logger.info(f"  - {name} (v{gen.version}): {gen.description}")
+
+        logger.info(f"\nExporters ({len(plugins['exporters'])}):")
+        for name in plugins['exporters']:
+            exp = plugin_registry.get_exporter(name)
+            if exp:
+                logger.info(f"  - {name} (v{exp.version}): {exp.description}")
+
+        logger.info(f"\nAnalyzers ({len(plugins['analyzers'])}):")
+        for name in plugins['analyzers']:
+            ana = plugin_registry.get_analyzer(name)
+            if ana:
+                logger.info(f"  - {name} (v{ana.version}): {ana.description}")
+
+        if not any(plugins.values()):
+            logger.info("\nNo plugins found. Install plugins to ~/.adapt-data/plugins/")
+
         return 0
     else:
         parser.print_help()

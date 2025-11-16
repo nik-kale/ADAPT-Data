@@ -5,12 +5,29 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from generator.core.base import BaseGenerator, IncidentContext
+from generator.core.distributions import (
+    UniformDistribution,
+    LogNormalDistribution,
+    CPU_DISTRIBUTION,
+    MEMORY_DISTRIBUTION
+)
+from generator.core.patterns import (
+    create_daily_pattern,
+    NoisePattern
+)
 from generator.core.logging_config import get_logger
 from generator.core.timeline import TimelineGenerator
 from generator.core.utils import timestamp_to_iso, generate_uuid
 from generator.anomalies.injectors import ErrorRateInjector
 
 logger = get_logger(__name__)
+
+# Distributions for realistic data generation
+_USER_ID_DIST = UniformDistribution(min_val=1000, max_val=999999)
+_SUCCESS_DURATION_DIST = LogNormalDistribution(mu=3, sigma=0.4)  # ~10-50ms
+_AUTH_REQUESTS_DIST = UniformDistribution(min_val=90, max_val=110)
+_REDIS_ERROR_DIST = UniformDistribution(min_val=10, max_val=30)
+_REDIS_CONN_DIST = UniformDistribution(min_val=5, max_val=15)
 
 
 class AuthFailureGenerator(BaseGenerator):
@@ -41,6 +58,10 @@ class AuthFailureGenerator(BaseGenerator):
         self.affected_service = affected_service
         self.baseline_error_rate = baseline_error_rate
         self.spike_error_rate = spike_error_rate
+
+        # Time-series patterns for realistic data
+        self.auth_rate_pattern = create_daily_pattern(amplitude=0.3)
+        self.metric_noise = NoisePattern(noise_level=0.05)
 
         context.affected_services = [affected_service, "api-gateway"]
         context.root_cause = f"Redis cache connection failures causing {affected_service} auth failures"
@@ -102,6 +123,7 @@ class AuthFailureGenerator(BaseGenerator):
                             "Redis connection refused",
                             "Unable to validate auth token"
                         ]
+                        user_id = int(_USER_ID_DIST.sample())
                         logs.append({
                             "timestamp": timestamp_to_iso(current_time),
                             "level": "ERROR",
@@ -110,12 +132,14 @@ class AuthFailureGenerator(BaseGenerator):
                             "message": random.choice(error_messages),
                             "metadata": {
                                 "error_code": "CACHE_UNAVAILABLE",
-                                "user_id": f"user_{random.randint(1000, 9999)}",
+                                "user_id": f"user_{user_id}",
                                 "request_id": generate_uuid()
                             }
                         })
                     else:
                         # Success log
+                        user_id = int(_USER_ID_DIST.sample())
+                        duration_ms = max(10, min(50, _SUCCESS_DURATION_DIST.sample()))
                         logs.append({
                             "timestamp": timestamp_to_iso(current_time),
                             "level": "INFO",
@@ -123,8 +147,8 @@ class AuthFailureGenerator(BaseGenerator):
                             "host": host,
                             "message": "User authenticated successfully",
                             "metadata": {
-                                "user_id": f"user_{random.randint(1000, 9999)}",
-                                "duration_ms": random.uniform(10, 50),
+                                "user_id": f"user_{user_id}",
+                                "duration_ms": round(duration_ms, 2),
                                 "request_id": generate_uuid()
                             }
                         })
@@ -154,11 +178,17 @@ class AuthFailureGenerator(BaseGenerator):
                 is_anomaly = self.context.is_during_incident(current_time)
 
                 # Auth metrics
+                base_auth_requests = _AUTH_REQUESTS_DIST.sample()
+                auth_requests = int(self.auth_rate_pattern.apply(base_auth_requests, current_time))
+
+                base_error_rate = error_rate
+                error_rate_with_noise = self.metric_noise.apply(base_error_rate, current_time)
+
                 metrics.extend([
                     {
                         "timestamp": timestamp_to_iso(current_time),
                         "metric_name": "auth_requests_total",
-                        "value": random.randint(90, 110),
+                        "value": auth_requests,
                         "service": self.affected_service,
                         "metric_type": "counter",
                         "unit": "requests",
@@ -169,7 +199,7 @@ class AuthFailureGenerator(BaseGenerator):
                     {
                         "timestamp": timestamp_to_iso(current_time),
                         "metric_name": "auth_error_rate",
-                        "value": round(error_rate, 4),
+                        "value": round(error_rate_with_noise, 4),
                         "service": self.affected_service,
                         "metric_type": "gauge",
                         "unit": "ratio",
@@ -181,11 +211,17 @@ class AuthFailureGenerator(BaseGenerator):
 
                 # Redis connection metrics
                 if is_anomaly:
+                    base_redis_errors = _REDIS_ERROR_DIST.sample()
+                    redis_errors = int(self.metric_noise.apply(base_redis_errors, current_time))
+
+                    base_redis_conns = _REDIS_CONN_DIST.sample()
+                    redis_conns = int(self.metric_noise.apply(base_redis_conns, current_time))
+
                     metrics.extend([
                         {
                             "timestamp": timestamp_to_iso(current_time),
                             "metric_name": "redis_connection_errors",
-                            "value": random.randint(10, 30),
+                            "value": redis_errors,
                             "service": "redis-cache",
                             "metric_type": "counter",
                             "unit": "errors",
@@ -196,7 +232,7 @@ class AuthFailureGenerator(BaseGenerator):
                         {
                             "timestamp": timestamp_to_iso(current_time),
                             "metric_name": "redis_active_connections",
-                            "value": random.randint(5, 15),
+                            "value": redis_conns,
                             "service": "redis-cache",
                             "metric_type": "gauge",
                             "unit": "connections",

@@ -5,11 +5,26 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from generator.core.base import BaseGenerator, IncidentContext
+from generator.core.distributions import (
+    UniformDistribution,
+    NormalDistribution,
+    PoissonDistribution
+)
+from generator.core.patterns import (
+    create_daily_pattern,
+    NoisePattern
+)
 from generator.core.logging_config import get_logger
 from generator.core.timeline import TimelineGenerator
 from generator.core.utils import timestamp_to_iso, generate_uuid, gaussian_noise
 
 logger = get_logger(__name__)
+
+# Distributions for realistic data generation
+_CPU_BURST_DIST = UniformDistribution(min_val=85, max_val=99)  # CPU % during bursts
+_GC_PAUSE_NORMAL_DIST = UniformDistribution(min_val=5, max_val=50)  # GC pause ms (normal)
+_GC_PAUSE_BURST_DIST = UniformDistribution(min_val=800, max_val=2000)  # GC pause ms (burst)
+_REQUEST_DURATION_NORMAL_DIST = UniformDistribution(min_val=20, max_val=60)  # Request duration ms (normal)
 
 
 class BurstyNoiseGenerator(BaseGenerator):
@@ -41,6 +56,11 @@ class BurstyNoiseGenerator(BaseGenerator):
 
         context.affected_services = [affected_service]
         context.root_cause = f"Resource contention from noisy neighbor causing intermittent performance bursts in {affected_service}"
+
+        # Time-series patterns for realistic data
+        self.cpu_noise = NoisePattern(noise_level=0.08)
+        self.latency_noise = NoisePattern(noise_level=0.20)
+        self.memory_noise = NoisePattern(noise_level=0.10)
 
     def generate(self) -> dict[str, Any]:
         """Generate complete incident dataset."""
@@ -110,8 +130,8 @@ class BurstyNoiseGenerator(BaseGenerator):
                             "host": host,
                             "message": random.choice(messages),
                             "metadata": {
-                                "cpu_percent": random.uniform(85, 99),
-                                "gc_pause_ms": random.uniform(500, 2000),
+                                "cpu_percent": _CPU_BURST_DIST.sample(),
+                                "gc_pause_ms": _GC_PAUSE_BURST_DIST.sample(),
                                 "request_id": generate_uuid()
                             }
                         })
@@ -123,7 +143,7 @@ class BurstyNoiseGenerator(BaseGenerator):
                             "host": host,
                             "message": "Request processed",
                             "metadata": {
-                                "duration_ms": random.uniform(20, 60),
+                                "duration_ms": _REQUEST_DURATION_NORMAL_DIST.sample(),
                                 "request_id": generate_uuid()
                             }
                         })
@@ -149,10 +169,10 @@ class BurstyNoiseGenerator(BaseGenerator):
                 base_latency = 50.0 if not in_burst else 450.0
                 base_memory = 512.0 if not in_burst else 850.0
 
-                # Add significant noise
-                cpu = max(0, min(100, base_cpu + gaussian_noise(0, 8)))
-                latency = max(0, base_latency + gaussian_noise(0, base_latency * 0.3))
-                memory = max(0, base_memory + gaussian_noise(0, base_memory * 0.1))
+                # Apply time-series patterns
+                cpu = max(0, min(100, self.cpu_noise.apply(base_cpu, current_time)))
+                latency = max(0, self.latency_noise.apply(base_latency, current_time))
+                memory = max(0, self.memory_noise.apply(base_memory, current_time))
 
                 metrics.extend([
                     {
@@ -191,7 +211,7 @@ class BurstyNoiseGenerator(BaseGenerator):
                     {
                         "timestamp": timestamp_to_iso(current_time),
                         "metric_name": "gc_pause_duration_ms",
-                        "value": round(random.uniform(800, 2000) if in_burst else random.uniform(5, 50), 2),
+                        "value": round(_GC_PAUSE_BURST_DIST.sample() if in_burst else _GC_PAUSE_NORMAL_DIST.sample(), 2),
                         "service": self.affected_service,
                         "metric_type": "gauge",
                         "unit": "ms",

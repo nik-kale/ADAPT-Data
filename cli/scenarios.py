@@ -4,16 +4,20 @@ from pathlib import Path
 
 import yaml
 
+from generator.core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 def list_scenarios() -> None:
     """List all available scenarios."""
     scenarios_dir = Path(__file__).parent.parent / "scenarios"
 
     if not scenarios_dir.exists():
-        print("No scenarios directory found")
+        logger.error("No scenarios directory found")
         return
 
-    print("Available scenarios:\n")
+    logger.info("Available scenarios:\n")
 
     for scenario_file in sorted(scenarios_dir.glob("*.yaml")):
         try:
@@ -24,11 +28,11 @@ def list_scenarios() -> None:
             desc = config.get("description", "No description")
             incident_type = config.get("type", "unknown")
 
-            print(f"  {name}")
-            print(f"    Type: {incident_type}")
-            print(f"    Description: {desc}")
-            print()
+            logger.info(f"  {name}")
+            logger.info(f"    Type: {incident_type}")
+            logger.info(f"    Description: {desc}")
+            logger.info("")
 
         except Exception as e:
-            print(f"  {scenario_file.stem} (error loading: {e})")
-            print()
+            logger.error(f"  {scenario_file.stem} (error loading: {e})")
+            logger.info("")
