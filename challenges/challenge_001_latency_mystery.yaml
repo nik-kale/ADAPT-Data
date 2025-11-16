@@ -1,0 +1,99 @@
+title: "The Mysterious Latency Spike"
+description: |
+  Your e-commerce platform's order service is experiencing elevated latency.
+  Customers are complaining about slow checkout. Your monitoring shows p95
+  latency has jumped from 50ms to 500ms. Find the root cause!
+
+difficulty: medium
+expected_time_minutes: 30
+points: 100
+
+incident:
+  type: latency_regression
+  parameters:
+    affected_service: order-service
+    baseline_latency_ms: 50.0
+    degraded_latency_ms: 500.0
+  duration: 1h
+  severity: SEV2
+
+hints:
+  - level: 1
+    cost: 10
+    text: "Check the timeline for recent changes before the latency spike started."
+
+  - level: 2
+    cost: 20
+    text: "Look at database query performance metrics and slow query logs."
+
+  - level: 3
+    cost: 30
+    text: "A deployment happened 5 minutes before the incident. Check what changed."
+
+  - level: 4
+    cost: 40
+    text: "The new version introduced a missing database index on user_id column."
+
+solution:
+  root_cause: "Missing database index on orders.user_id after deployment v1.5.2"
+  affected_services: ["order-service"]
+  contributing_factors:
+    - "Deployment v1.5.1 -> v1.5.2"
+    - "New query pattern requiring index"
+    - "Table growth made missing index significant"
+
+  mitigation_steps:
+    - "Rollback to v1.5.1"
+    - "Add index: CREATE INDEX idx_orders_user_id ON orders(user_id)"
+    - "Re-deploy v1.5.2 with index migration"
+
+  prevention:
+    - "Add database query performance tests to CI/CD"
+    - "Require database migrations review"
+    - "Monitor slow queries in staging"
+
+evaluation_criteria:
+  - criterion: "Identified root cause"
+    weight: 40
+    points: 40
+    description: "Correctly identified missing database index as root cause"
+
+  - criterion: "Time to detection"
+    weight: 20
+    points: 20
+    scoring:
+      - range: "<10m"
+        points: 20
+      - range: "10-20m"
+        points: 15
+      - range: "20-30m"
+        points: 10
+      - range: ">30m"
+        points: 5
+
+  - criterion: "Correct mitigation"
+    weight: 20
+    points: 20
+    description: "Proposed appropriate mitigation strategy"
+
+  - criterion: "Identified contributing factors"
+    weight: 10
+    points: 10
+    description: "Found deployment correlation and table growth"
+
+  - criterion: "Prevention recommendations"
+    weight: 10
+    points: 10
+    description: "Suggested preventive measures"
+
+learning_objectives:
+  - "Correlate deployments with performance changes"
+  - "Analyze database query performance"
+  - "Understand index impact on query time"
+  - "Practice timeline analysis"
+
+tags:
+  - performance
+  - database
+  - deployment
+  - latency

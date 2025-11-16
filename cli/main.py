@@ -66,6 +66,69 @@ def main() -> int:
         help="List available scenarios"
     )
 
+    # Stats command
+    stats_parser = subparsers.add_parser(
+        "stats",
+        help="Analyze dataset statistics"
+    )
+    stats_parser.add_argument(
+        "dataset_dir",
+        help="Directory containing dataset"
+    )
+    stats_parser.add_argument(
+        "--output",
+        help="Export stats to JSON file"
+    )
+
+    # Wizard command
+    wizard_parser = subparsers.add_parser(
+        "wizard",
+        help="Interactive scenario configuration wizard"
+    )
+
+    # Export command
+    export_parser = subparsers.add_parser(
+        "export",
+        help="Export dataset to other formats"
+    )
+    export_parser.add_argument(
+        "dataset_dir",
+        help="Directory containing dataset"
+    )
+    export_parser.add_argument(
+        "--format",
+        choices=["opentelemetry", "prometheus"],
+        required=True,
+        help="Export format"
+    )
+    export_parser.add_argument(
+        "--output",
+        required=True,
+        help="Output file path"
+    )
+
+    # Serve command (for Prometheus)
+    serve_parser = subparsers.add_parser(
+        "serve",
+        help="Serve metrics via HTTP (Prometheus)"
+    )
+    serve_parser.add_argument(
+        "dataset_dir",
+        help="Directory containing dataset"
+    )
+    serve_parser.add_argument(
+        "--port",
+        type=int,
+        default=9090,
+        help="HTTP port (default: 9090)"
+    )
+    serve_parser.add_argument(
+        "--replay-speed",
+        type=float,
+        default=1.0,
+        help="Replay speed multiplier (default: 1.0)"
+    )
+
     args = parser.parse_args()
 
     if args.command == "generate":
@@ -83,6 +146,36 @@ def main() -> int:
     elif args.command == "list-scenarios":
         from cli.scenarios import list_scenarios
         list_scenarios()
+        return 0
+    elif args.command == "stats":
+        from cli.stats import analyze_dataset, print_stats, export_stats
+        stats = analyze_dataset(Path(args.dataset_dir))
+        print_stats(stats)
+        if args.output:
+            export_stats(stats, Path(args.output))
+        return 0
+    elif args.command == "wizard":
+        from cli.wizard import run_wizard
+        run_wizard()
+        return 0
+    elif args.command == "export":
+        dataset_dir = Path(args.dataset_dir)
+        if args.format == "opentelemetry":
+            from generator.exporters.opentelemetry import OpenTelemetryExporter
+            exporter = OpenTelemetryExporter(dataset_dir)
+            if "trace" in args.output:
+                exporter.export_traces(Path(args.output))
+            else:
+                exporter.export_metrics(Path(args.output))
+        elif args.format == "prometheus":
+            from generator.exporters.prometheus import PrometheusExporter
+            exporter = PrometheusExporter(dataset_dir)
+            exporter.export_text_format(Path(args.output))
+        return 0
+    elif args.command == "serve":
+        from generator.exporters.prometheus import PrometheusExporter
+        exporter = PrometheusExporter(Path(args.dataset_dir))
+        exporter.serve(port=args.port, replay_speed=args.replay_speed)
         return 0
     else:
         parser.print_help()

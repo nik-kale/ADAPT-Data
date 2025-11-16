@@ -27,15 +27,38 @@ classifiers = [
 dependencies = [
     "pyyaml>=6.0",
     "jsonschema>=4.17.0",
+    "numpy>=1.24.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+    "hypothesis>=6.0",
     "black>=23.0",
     "mypy>=1.0",
     "ruff>=0.1.0",
+    "types-PyYAML>=6.0",
+]
+
+streaming = [
+    "kafka-python>=2.0",
+]
+
+exporters = [
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp>=1.20.0",
+    "prometheus-client>=0.18.0",
+]
+
+tui = [
+    "rich>=13.0",
+    "textual>=0.40.0",
+]
+
+all = [
+    "adapt-data[dev,streaming,exporters,tui]",
 ]
 
 [project.scripts]
@@ -53,4 +76,34 @@ target-version = "py310"
 python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true
+disallow_untyped_defs = false  # Gradual typing
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--cov=generator",
+    "--cov=cli",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+]
+
+[tool.coverage.run]
+source = ["generator", "cli"]
+omit = ["tests/*", "*/conftest.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]

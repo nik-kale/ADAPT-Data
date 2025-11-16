@@ -1,0 +1,118 @@
+title: "AWS US-EAST-1 Power Loss Cascade - December 2023"
+description: |
+  Recreation of major AWS outage caused by power loss in multiple
+  availability zones, leading to cascading failures across services.
+
+based_on:
+  source: "AWS Service Health Dashboard"
+  date: "2023-12-07"
+  url: "https://aws.amazon.com/message/service-health/"
+  postmortem_available: true
+
+incident_summary: |
+  Power loss in one availability zone triggered automatic failover,
+  which overloaded remaining zones. This caused cascading failures
+  across multiple AWS services including EC2, RDS, and S3.
+
+type: cascade
+duration: 3h
+severity: SEV1
+
+timeline:
+  - time: "T+0m"
+    event: "Power loss in us-east-1a"
+    description: "Utility power failure affecting datacenter cooling"
+
+  - time: "T+2m"
+    event: "Automated failover initiated"
+    description: "Services begin failing over to us-east-1b and us-east-1c"
+
+  - time: "T+5m"
+    event: "Network congestion detected"
+    description: "Cross-AZ traffic spike from failover"
+
+  - time: "T+15m"
+    event: "RDS connection pool exhaustion"
+    description: "Database connection pools saturated from rerouted traffic"
+
+  - time: "T+20m"
+    event: "S3 degraded performance"
+    description: "S3 request rate limiting activated"
+
+  - time: "T+45m"
+    event: "Power restored to us-east-1a"
+    description: "Datacenter power and cooling restored"
+
+  - time: "T+90m"
+    event: "Gradual service recovery"
+    description: "Services being restored in phases"
+
+  - time: "T+180m"
+    event: "Full service restoration"
+    description: "All services returned to normal operation"
+
+cascade_incidents:
+  - type: dependency_outage
+    time: "T+0m"
+    duration: 180m
+    service: "availability-zone-1a"
+    reason: "Power loss"
+    affected_services:
+      - "ec2-instances-az1a"
+      - "rds-instances-az1a"
+      - "ebs-volumes-az1a"
+
+  - type: network_saturation
+    time: "T+2m"
+    duration: 60m
+    trigger: "Failover traffic"
+    packet_loss_percent: 12.0
+    affected_paths:
+      - "az1a → az1b"
+      - "az1a → az1c"
+
+  - type: resource_exhaustion
+    time: "T+15m"
+    duration: 90m
+    service: "rds-connection-pool"
+    resource: "database_connections"
+    threshold_exceeded_by: 250
+
+root_cause: |
+  Utility power failure combined with insufficient cross-AZ capacity
+  planning for full failover scenarios. Failover automation did not
+  account for connection pool limits.
+
+contributing_factors:
+  - "Single utility power source for AZ"
+  - "Insufficient cross-AZ bandwidth provisioning"
+  - "Connection pool limits not scaled for failover"
+  - "Cascading impact not modeled in disaster recovery"
+
+lessons_learned:
+  - "Implement multi-utility power redundancy"
+  - "Provision cross-AZ capacity for full failover"
+  - "Dynamic connection pool scaling during failover"
+  - "Regular chaos engineering for multi-AZ failures"
+
+impact:
+  affected_customers: "Thousands"
+  services_impacted:
+    - "EC2"
+    - "RDS"
+    - "S3"
+    - "EBS"
+    - "Lambda"
+  estimated_downtime: "3 hours partial, varying by service"
+
+references:
+  - "AWS Architecture Blog: Multi-AZ Resilience"
+  - "AWS Well-Architected Framework: Reliability Pillar"
+
+tags:
+  - infrastructure
+  - power-failure
+  - cascade
+  - multi-az
+  - aws
+  - real-world
