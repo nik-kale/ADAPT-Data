@@ -5,8 +5,11 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from generator.core.base import BaseGenerator, IncidentContext
+from generator.core.logging_config import get_logger
 from generator.core.timeline import TimelineGenerator
 from generator.core.utils import timestamp_to_iso, generate_uuid
+
+logger = get_logger(__name__)
 
 
 class PacketLossGenerator(BaseGenerator):
@@ -38,7 +41,7 @@ class PacketLossGenerator(BaseGenerator):
 
     def generate(self) -> dict[str, Any]:
         """Generate complete incident dataset."""
-        print(f"Generating packet loss incident ({self.packet_loss_percent}% loss)...")
+        logger.info(f"Generating packet loss incident ({self.packet_loss_percent}% loss)...")
 
         logs = self._generate_logs()
         metrics = self._generate_metrics()
@@ -46,9 +49,9 @@ class PacketLossGenerator(BaseGenerator):
         config_deltas = self._generate_config_deltas()
         timeline = self._generate_timeline()
 
-        print(f"  Generated {len(logs)} log entries")
-        print(f"  Generated {len(metrics)} metric points")
-        print(f"  Generated {len(traces)} traces")
+        logger.info(f"  Generated {len(logs)} log entries")
+        logger.info(f"  Generated {len(metrics)} metric points")
+        logger.info(f"  Generated {len(traces)} traces")
 
         self.save_jsonl(logs, f"logs_{self.context.incident_id}.jsonl", "logs")
         self.save_jsonl(metrics, f"metrics_{self.context.incident_id}.jsonl", "metrics")

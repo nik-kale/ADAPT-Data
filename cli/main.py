@@ -129,6 +129,53 @@ def main() -> int:
         help="Replay speed multiplier (default: 1.0)"
     )
 
+    # Version command
+    version_parser = subparsers.add_parser(
+        "version",
+        help="Show version information"
+    )
+
+    # Doctor command
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Run health checks"
+    )
+    doctor_parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Show verbose output"
+    )
+
+    # Clean command
+    clean_parser = subparsers.add_parser(
+        "clean",
+        help="Clean generated files"
+    )
+    clean_parser.add_argument(
+        "path",
+        help="Directory to clean"
+    )
+    clean_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be deleted"
+    )
+    clean_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Don't ask for confirmation"
+    )
+
+    # Info command
+    info_parser = subparsers.add_parser(
+        "info",
+        help="Show dataset information"
+    )
+    info_parser.add_argument(
+        "dataset_dir",
+        help="Dataset directory"
+    )
+
     args = parser.parse_args()
 
     if args.command == "generate":
@@ -177,6 +224,19 @@ def main() -> int:
         exporter = PrometheusExporter(Path(args.dataset_dir))
         exporter.serve(port=args.port, replay_speed=args.replay_speed)
         return 0
+    elif args.command == "version":
+        from cli.utils import print_version
+        print_version()
+        return 0
+    elif args.command == "doctor":
+        from cli.utils import doctor
+        return doctor(verbose=args.verbose)
+    elif args.command == "clean":
+        from cli.utils import clean
+        return clean(Path(args.path), dry_run=args.dry_run, force=args.force)
+    elif args.command == "info":
+        from cli.utils import info
+        return info(Path(args.dataset_dir))
     else:
         parser.print_help()
         return 1

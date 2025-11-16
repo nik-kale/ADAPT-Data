@@ -5,9 +5,12 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from generator.core.base import BaseGenerator, IncidentContext
+from generator.core.logging_config import get_logger
 from generator.core.timeline import TimelineGenerator
 from generator.core.utils import timestamp_to_iso, generate_uuid
 from generator.anomalies.injectors import LatencyInjector
+
+logger = get_logger(__name__)
 
 
 class LatencyRegressionGenerator(BaseGenerator):
@@ -50,7 +53,7 @@ class LatencyRegressionGenerator(BaseGenerator):
         Returns:
             Summary of generated data
         """
-        print(f"Generating latency regression incident for {self.affected_service}...")
+        logger.info(f"Generating latency regression incident for {self.affected_service}...")
 
         # Generate components
         logs = self._generate_logs()
@@ -59,11 +62,11 @@ class LatencyRegressionGenerator(BaseGenerator):
         config_deltas = self._generate_config_deltas()
         timeline = self._generate_timeline()
 
-        print(f"  Generated {len(logs)} log entries")
-        print(f"  Generated {len(metrics)} metric points")
-        print(f"  Generated {len(traces)} traces")
-        print(f"  Generated {len(config_deltas)} config changes")
-        print(f"  Generated timeline with {len(timeline['events'])} events")
+        logger.info(f"  Generated {len(logs)} log entries")
+        logger.info(f"  Generated {len(metrics)} metric points")
+        logger.info(f"  Generated {len(traces)} traces")
+        logger.info(f"  Generated {len(config_deltas)} config changes")
+        logger.info(f"  Generated timeline with {len(timeline['events'])} events")
 
         # Save files
         self.save_jsonl(logs, f"logs_{self.context.incident_id}.jsonl", "logs")

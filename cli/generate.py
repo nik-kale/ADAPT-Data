@@ -6,16 +6,22 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from pydantic import ValidationError
 
 from generator.core.base import IncidentContext
+from generator.core.logging_config import get_logger
 from generator.core.topology import TopologyGenerator
 from generator.core.utils import parse_duration
+from generator.core.validation import validate_scenario_file, GenerationConfig
 from generator.incidents.latency_regression import LatencyRegressionGenerator
 from generator.incidents.auth_failure import AuthFailureGenerator
 from generator.incidents.dependency_outage import DependencyOutageGenerator
 from generator.incidents.config_drift import ConfigDriftGenerator
 from generator.incidents.packet_loss import PacketLossGenerator
 from generator.incidents.bursty_noise import BurstyNoiseGenerator
+from generator.incidents.cascade import CascadeGenerator
+
+logger = get_logger(__name__)
 
 
 GENERATOR_MAP = {
@@ -25,6 +31,7 @@ GENERATOR_MAP = {
     "config_drift": ConfigDriftGenerator,
     "packet_loss": PacketLossGenerator,
     "bursty_noise": BurstyNoiseGenerator,
+    "cascade": CascadeGenerator,
 }
 
 
@@ -78,6 +85,18 @@ def generate_incident(
         Exit code
     """
     try:
+        # Validate generation configuration first
+        try:
+            config = GenerationConfig(
+                scenario=scenario,
+                output_dir=output_dir,
+                duration=duration,
+                severity=severity
+            )
+        except ValidationError as e:
+            logger.error(f"Invalid configuration: {e}")
+            return 1
+
         # Load scenario
         scenario_path = Path(scenario)
         if not scenario_path.exists():
@@ -86,26 +105,45 @@ def generate_incident(
             if found_path:
                 scenario_path = found_path
             else:
-                print(f"Error: Scenario not found: {scenario}")
+                logger.error(f"Scenario not found: {scenario}")
                 return 1
 
-        print(f"Loading scenario: {scenario_path}")
-        scenario_config = load_scenario(scenario_path)
+        logger.info(f"Loading scenario: {scenario_path}")
+
+        # Validate scenario file (security + schema validation)
+        try:
+            scenario_config_validated = validate_scenario_file(scenario_path)
+            scenario_config = scenario_config_validated.model_dump()
+        except ValidationError as e:
+            logger.error(f"Invalid scenario file: {e}")
+            return 1
+        except ValueError as e:
+            logger.error(f"Scenario validation error: {e}")
+            return 1
 
         # Parse duration
         duration_td = parse_duration(duration)
+
+        # Create output directory with security checks
+        try:
+            # Ensure output_dir is created safely
+            output_dir_abs = output_dir.resolve()
+            output_dir_abs.mkdir(parents=True, exist_ok=True)
+        except (OSError, RuntimeError) as e:
+            logger.error(f"Cannot create output directory {output_dir}: {e}")
+            return 1
 
         # Create incident context
         context = IncidentContext(
             start_time=datetime.utcnow(),
             duration=duration_td,
             severity=severity,
-            output_dir=output_dir,
+            output_dir=output_dir_abs,
             scenario_config=scenario_config
         )
 
         # Generate topology
-        print("Generating topology...")
+        logger.info("Generating topology...")
         topo_gen = TopologyGenerator(context)
         topology = topo_gen.generate()
         context.topology = topology
@@ -113,29 +151,32 @@ def generate_incident(
         # Get generator type
         generator_type = scenario_config.get("type")
         if generator_type not in GENERATOR_MAP:
-            print(f"Error: Unknown generator type: {generator_type}")
-            print(f"Available types: {', '.join(GENERATOR_MAP.keys())}")
+            logger.error(f"Unknown generator type: {generator_type}")
+            logger.info(f"Available types: {', '.join(GENERATOR_MAP.keys())}")
             return 1
 
         # Create generator
         generator_class = GENERATOR_MAP[generator_type]
         generator_params = scenario_config.get("parameters", {})
-        generator = generator_class(context, **generator_params)
+
+        try:
+            generator = generator_class(context, **generator_params)
+        except (TypeError, ValueError) as e:
+            logger.error(f"Error creating generator: {e}")
+            return 1
 
         # Generate incident
-        print(f"\nGenerating {generator_type} incident...")
+        logger.info(f"Generating {generator_type} incident...")
         result = generator.generate()
 
-        print(f"\n✓ Successfully generated incident: {result['incident_id']}")
-        print(f"  Output directory: {output_dir}")
-        print(f"  Incident type: {result['incident_type']}")
-        print(f"  Duration: {duration}")
-        print(f"  Severity: {severity}")
+        logger.info(f"✓ Successfully generated incident: {result['incident_id']}")
+        logger.info(f"  Output directory: {output_dir}")
+        logger.info(f"  Incident type: {result['incident_type']}")
+        logger.info(f"  Duration: {duration}")
+        logger.info(f"  Severity: {severity}")
 
         return 0
 
     except Exception as e:
-        print(f"Error generating incident: {e}", file=sys.stderr)
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error generating incident: {e}", exc_info=True)
         return 1

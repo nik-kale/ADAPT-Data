@@ -5,6 +5,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from generator.core.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 class OpenTelemetryExporter:
     """Export ADAPT-Data to OpenTelemetry format.
@@ -26,29 +30,67 @@ class OpenTelemetryExporter:
 
         Args:
             output_path: Where to write OTLP traces
+
+        Raises:
+            ValueError: If traces directory not found or no traces to export
+            IOError: If file operations fail
         """
         traces_dir = self.dataset_dir / "traces"
         if not traces_dir.exists():
+            logger.error(f"Traces directory not found: {traces_dir}")
             raise ValueError(f"Traces directory not found: {traces_dir}")
 
         otlp_traces = {
             "resourceSpans": []
         }
 
-        for trace_file in traces_dir.glob("*.jsonl"):
-            with open(trace_file) as f:
-                for line in f:
-                    if not line.strip():
-                        continue
+        trace_files = list(traces_dir.glob("*.jsonl"))
+        if not trace_files:
+            logger.warning(f"No trace files found in {traces_dir}")
+            raise ValueError(f"No trace files found in {traces_dir}")
 
-                    trace = json.loads(line)
-                    resource_span = self._convert_trace_to_otlp(trace)
-                    otlp_traces["resourceSpans"].append(resource_span)
+        logger.info(f"Processing {len(trace_files)} trace files...")
 
-        with open(output_path, 'w') as f:
-            json.dump(otlp_traces, f, indent=2)
+        errors = 0
+        for trace_file in trace_files:
+            try:
+                with open(trace_file) as f:
+                    for line_num, line in enumerate(f, 1):
+                        if not line.strip():
+                            continue
 
-        print(f"Exported {len(otlp_traces['resourceSpans'])} traces to {output_path}")
+                        try:
+                            trace = json.loads(line)
+                            resource_span = self._convert_trace_to_otlp(trace)
+                            otlp_traces["resourceSpans"].append(resource_span)
+                        except json.JSONDecodeError as e:
+                            logger.error(f"JSON decode error in {trace_file}:{line_num}: {e}")
+                            errors += 1
+                        except KeyError as e:
+                            logger.error(f"Missing required field in {trace_file}:{line_num}: {e}")
+                            errors += 1
+                        except Exception as e:
+                            logger.error(f"Error processing trace in {trace_file}:{line_num}: {e}")
+                            errors += 1
+            except IOError as e:
+                logger.error(f"Error reading {trace_file}: {e}")
+                errors += 1
+
+        if not otlp_traces["resourceSpans"]:
+            logger.error("No valid traces found to export")
+            raise ValueError("No valid traces found to export")
+
+        try:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, 'w') as f:
+                json.dump(otlp_traces, f, indent=2)
+        except IOError as e:
+            logger.error(f"Error writing to {output_path}: {e}")
+            raise
+
+        logger.info(f"Exported {len(otlp_traces['resourceSpans'])} traces to {output_path}")
+        if errors > 0:
+            logger.warning(f"Encountered {errors} errors during export")
 
     def _convert_trace_to_otlp(self, trace: dict[str, Any]) -> dict[str, Any]:
         """Convert ADAPT trace to OTLP format.
@@ -148,9 +190,14 @@ class OpenTelemetryExporter:
 
         Args:
             output_path: Where to write OTLP metrics
+
+        Raises:
+            ValueError: If metrics directory not found or no metrics to export
+            IOError: If file operations fail
         """
         metrics_dir = self.dataset_dir / "metrics"
         if not metrics_dir.exists():
+            logger.error(f"Metrics directory not found: {metrics_dir}")
             raise ValueError(f"Metrics directory not found: {metrics_dir}")
 
         otlp_metrics = {
@@ -160,29 +207,64 @@ class OpenTelemetryExporter:
         # Group metrics by name and service
         metrics_by_name: dict[tuple[str, str], list[dict]] = {}
 
-        for metric_file in metrics_dir.glob("*.jsonl"):
-            with open(metric_file) as f:
-                for line in f:
-                    if not line.strip():
-                        continue
+        metric_files = list(metrics_dir.glob("*.jsonl"))
+        if not metric_files:
+            logger.warning(f"No metric files found in {metrics_dir}")
+            raise ValueError(f"No metric files found in {metrics_dir}")
 
-                    metric = json.loads(line)
-                    key = (metric["metric_name"], metric["service"])
+        logger.info(f"Processing {len(metric_files)} metric files...")
 
-                    if key not in metrics_by_name:
-                        metrics_by_name[key] = []
+        errors = 0
+        for metric_file in metric_files:
+            try:
+                with open(metric_file) as f:
+                    for line_num, line in enumerate(f, 1):
+                        if not line.strip():
+                            continue
 
-                    metrics_by_name[key].append(metric)
+                        try:
+                            metric = json.loads(line)
+                            key = (metric.get("metric_name", "unknown"), metric.get("service", "unknown"))
+
+                            if key not in metrics_by_name:
+                                metrics_by_name[key] = []
+
+                            metrics_by_name[key].append(metric)
+                        except json.JSONDecodeError as e:
+                            logger.error(f"JSON decode error in {metric_file}:{line_num}: {e}")
+                            errors += 1
+                        except Exception as e:
+                            logger.error(f"Error processing metric in {metric_file}:{line_num}: {e}")
+                            errors += 1
+            except IOError as e:
+                logger.error(f"Error reading {metric_file}: {e}")
+                errors += 1
+
+        if not metrics_by_name:
+            logger.error("No valid metrics found to export")
+            raise ValueError("No valid metrics found to export")
 
         # Convert to OTLP
+        logger.info(f"Converting {len(metrics_by_name)} metric series to OTLP...")
         for (metric_name, service), points in metrics_by_name.items():
-            resource_metric = self._convert_metrics_to_otlp(metric_name, service, points)
-            otlp_metrics["resourceMetrics"].append(resource_metric)
+            try:
+                resource_metric = self._convert_metrics_to_otlp(metric_name, service, points)
+                otlp_metrics["resourceMetrics"].append(resource_metric)
+            except Exception as e:
+                logger.error(f"Error converting metric {metric_name} for {service}: {e}")
+                errors += 1
 
-        with open(output_path, 'w') as f:
-            json.dump(otlp_metrics, f, indent=2)
+        try:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(output_path, 'w') as f:
+                json.dump(otlp_metrics, f, indent=2)
+        except IOError as e:
+            logger.error(f"Error writing to {output_path}: {e}")
+            raise
 
-        print(f"Exported {len(otlp_metrics['resourceMetrics'])} metric series to {output_path}")
+        logger.info(f"Exported {len(otlp_metrics['resourceMetrics'])} metric series to {output_path}")
+        if errors > 0:
+            logger.warning(f"Encountered {errors} errors during export")
 
     def _convert_metrics_to_otlp(
         self,

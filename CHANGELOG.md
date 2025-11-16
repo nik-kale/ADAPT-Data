@@ -2,6 +2,78 @@
 
 All notable changes to ADAPT-Data will be documented in this file.
 
+## [0.3.0] - 2025-01-16
+
+### Added - Production-Ready Features
+
+- **Centralized Logging Framework**: Structured logging throughout the codebase
+  - Color-coded terminal output (INFO=green, WARNING=yellow, ERROR=red)
+  - File logging support with module-level loggers
+  - Replaced 40+ print() statements with proper logging
+  - Production-ready observability
+
+- **Input Validation Framework**: Pydantic-based validation
+  - Type-safe validation for all configuration types
+  - Security validation (path traversal prevention, size limits)
+  - Comprehensive parameter validation for all incident types
+  - Clear, actionable error messages
+
+- **Utility CLI Commands**: Developer experience improvements
+  - `version`: Show version and system information
+  - `doctor`: Run health checks on installation
+  - `clean`: Clean generated files with dry-run support
+  - `info`: Quick dataset information display
+
+### Fixed - Critical Bugs
+
+- **Cascade Generator Data Merging**: Fixed critical data loss bug
+  - Sub-incidents now write to unique subdirectories
+  - Data is properly collected and merged
+  - Timeline correctly correlates all incidents
+  - No more data overwrites
+
+- **Security Vulnerabilities**: Hardened against attacks
+  - Path traversal prevention in file operations
+  - Input sanitization and length limits
+  - File size limits (1MB for scenario files)
+  - Safe path resolution
+
+- **Missing Error Handling**: Comprehensive error handling
+  - All file operations now have try/except blocks
+  - Detailed error logging with context
+  - Graceful degradation where possible
+  - No silent failures in exporters
+
+- **Cascade Generator Registration**: Registered in GENERATOR_MAP
+  - Cascade scenarios now accessible from CLI
+  - Properly integrated with validation system
+
+### Enhanced
+
+- **OpenTelemetry Exporter**: Added comprehensive error handling
+  - Line-by-line error tracking
+  - Input validation before processing
+  - Helpful error messages with file:line context
+
+- **Prometheus Exporter**: Added comprehensive error handling
+  - Server startup error handling
+  - Metric replay error tracking
+  - File operation error handling
+
+- **Generate Command**: Security and validation improvements
+  - Input validation using Pydantic models
+  - Secure output directory creation
+  - Proper error logging throughout
+
+### Dependencies
+
+- **Added**: `pydantic>=2.0.0` for input validation
+
+### Documentation
+
+- **Added**: V0.3.0_IMPROVEMENTS.md - Comprehensive release notes
+- **Updated**: Version to 0.3.0 in pyproject.toml
+
 ## [0.2.0] - 2025-01-16
 
 ### Added - Testing & Quality

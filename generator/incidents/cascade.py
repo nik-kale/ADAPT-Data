@@ -1,14 +1,19 @@
 """Multi-incident cascade generator."""
 
+import json
 import random
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from generator.core.base import BaseGenerator, IncidentContext
+from generator.core.logging_config import get_logger
 from generator.core.timeline import TimelineGenerator
 from generator.incidents.latency_regression import LatencyRegressionGenerator
 from generator.incidents.auth_failure import AuthFailureGenerator
 from generator.incidents.dependency_outage import DependencyOutageGenerator
+
+logger = get_logger(__name__)
 
 
 class CascadeGenerator(BaseGenerator):
@@ -60,7 +65,7 @@ class CascadeGenerator(BaseGenerator):
 
     def generate(self) -> dict[str, Any]:
         """Generate cascading incident data."""
-        print(f"Generating cascade with {len(self.cascade_config)} incidents...")
+        logger.info(f"Generating cascade with {len(self.cascade_config)} incidents...")
 
         all_logs = []
         all_metrics = []
@@ -72,7 +77,7 @@ class CascadeGenerator(BaseGenerator):
         current_time = self.context.start_time
 
         for i, incident_spec in enumerate(self.cascade_config):
-            print(f"  Generating incident {i+1}/{len(self.cascade_config)}: {incident_spec['type']}")
+            logger.info(f"  Generating incident {i+1}/{len(self.cascade_config)}: {incident_spec['type']}")
 
             # Calculate timing
             delay_str = incident_spec.get("delay", "0m")
@@ -82,13 +87,17 @@ class CascadeGenerator(BaseGenerator):
             duration_str = incident_spec.get("duration", "10m")
             incident_duration = self._parse_duration(duration_str)
 
+            # Create unique sub-directory for this incident to avoid overwrites
+            sub_output_dir = self.context.output_dir / f"sub_incident_{i+1}"
+            sub_output_dir.mkdir(parents=True, exist_ok=True)
+
             # Create sub-context for this incident
             sub_context = IncidentContext(
                 incident_id=f"{self.context.incident_id}-{i+1}",
                 start_time=incident_start,
                 duration=incident_duration,
                 severity=incident_spec.get("severity", self.context.severity),
-                output_dir=self.context.output_dir,
+                output_dir=sub_output_dir,
                 topology=self.context.topology,
                 scenario_config=self.context.scenario_config
             )
@@ -116,10 +125,24 @@ class CascadeGenerator(BaseGenerator):
                 )
             else:
                 # Fallback to latency
+                logger.warning(f"Unknown incident type '{incident_type}', using latency_regression")
                 generator = LatencyRegressionGenerator(sub_context, affected_service=service)
 
             # Generate incident data
             result = generator.generate()
+
+            # Collect generated data from sub-incident
+            logs = self._read_jsonl_files(sub_output_dir / "logs")
+            metrics = self._read_jsonl_files(sub_output_dir / "metrics")
+            traces = self._read_jsonl_files(sub_output_dir / "traces")
+            config_deltas = self._read_jsonl_files(sub_output_dir / "config_deltas")
+
+            all_logs.extend(logs)
+            all_metrics.extend(metrics)
+            all_traces.extend(traces)
+            all_config_deltas.extend(config_deltas)
+
+            logger.info(f"  Collected {len(logs)} logs, {len(metrics)} metrics, {len(traces)} traces")
 
             # Add to timeline
             timeline.add_event(
@@ -133,18 +156,59 @@ class CascadeGenerator(BaseGenerator):
             # Update current time for next incident
             current_time = incident_start + incident_duration
 
+        # Write merged data to main output directory
+        logger.info(f"Writing merged data: {len(all_logs)} logs, {len(all_metrics)} metrics, {len(all_traces)} traces")
+
+        if all_logs:
+            self.save_jsonl(all_logs, "cascade_logs.jsonl", "logs")
+        if all_metrics:
+            self.save_jsonl(all_metrics, "cascade_metrics.jsonl", "metrics")
+        if all_traces:
+            self.save_jsonl(all_traces, "cascade_traces.jsonl", "traces")
+        if all_config_deltas:
+            self.save_jsonl(all_config_deltas, "cascade_config_deltas.jsonl", "config_deltas")
+
         # Generate combined timeline
         timeline_result = timeline.generate()
 
-        print(f"  Generated cascade with {len(timeline_result['events'])} timeline events")
+        logger.info(f"Generated cascade with {len(timeline_result['events'])} timeline events")
 
         return {
             "incident_id": self.context.incident_id,
             "incident_type": "cascade",
             "num_incidents": len(self.cascade_config),
             "cascade_duration": str(self.context.duration),
-            "affected_services": len(self.context.affected_services)
+            "affected_services": len(self.context.affected_services),
+            "total_logs": len(all_logs),
+            "total_metrics": len(all_metrics),
+            "total_traces": len(all_traces)
         }
+
+    def _read_jsonl_files(self, directory: Path) -> list[dict[str, Any]]:
+        """Read all JSONL files from a directory.
+
+        Args:
+            directory: Directory containing JSONL files
+
+        Returns:
+            List of all JSON objects from all files
+        """
+        data = []
+
+        if not directory.exists():
+            return data
+
+        for jsonl_file in directory.glob("*.jsonl"):
+            try:
+                with open(jsonl_file, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            data.append(json.loads(line))
+            except Exception as e:
+                logger.error(f"Error reading {jsonl_file}: {e}")
+
+        return data
 
     def _parse_duration(self, duration_str: str) -> timedelta:
         """Parse duration string like '5m', '2h'."""
