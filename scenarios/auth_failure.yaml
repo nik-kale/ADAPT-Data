@@ -1,0 +1,24 @@
+type: auth_failure
+description: Authentication service failures due to cache unavailability
+
+parameters:
+  affected_service: auth-service
+  baseline_error_rate: 0.001
+  spike_error_rate: 0.25
+
+metadata:
+  category: availability
+  common_causes:
+    - Redis connection pool exhaustion
+    - Cache service outage
+    - Network connectivity issues
+    - Resource limits hit
+  detection_signals:
+    - Auth error rate spike
+    - 401/403 response increase
+    - Cache connection errors
+  mitigation_strategies:
+    - Increase cache connection limits
+    - Restart cache service
+    - Implement graceful degradation
+    - Add circuit breakers

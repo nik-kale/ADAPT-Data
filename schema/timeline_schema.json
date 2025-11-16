@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ADAPT Incident Timeline Schema",
+  "description": "Schema for incident timelines in ADAPT-Data",
+  "type": "object",
+  "required": ["incident_id", "start_time", "end_time", "events"],
+  "properties": {
+    "incident_id": {
+      "type": "string",
+      "description": "Unique incident identifier"
+    },
+    "title": {
+      "type": "string",
+      "description": "Incident title"
+    },
+    "start_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the incident started"
+    },
+    "end_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the incident ended"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["SEV1", "SEV2", "SEV3", "SEV4"],
+      "description": "Incident severity"
+    },
+    "affected_services": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "List of affected services"
+    },
+    "root_cause": {
+      "type": "string",
+      "description": "Human-readable root cause description"
+    },
+    "events": {
+      "type": "array",
+      "description": "Timeline of events during the incident",
+      "items": {
+        "type": "object",
+        "required": ["timestamp", "event_type", "description"],
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "event_type": {
+            "type": "string",
+            "enum": ["anomaly_detected", "alert_fired", "config_change", "deployment", "mitigation_attempted", "resolved", "other"]
+          },
+          "description": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  }
+}

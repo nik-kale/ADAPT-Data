@@ -1,0 +1,24 @@
+type: latency_regression
+description: Simple latency regression example for getting started
+
+parameters:
+  affected_service: order-service
+  baseline_latency_ms: 40.0
+  degraded_latency_ms: 300.0
+  error_threshold_ms: 600.0
+
+metadata:
+  category: performance
+  difficulty: beginner
+  estimated_duration: 30m
+  common_causes:
+    - Inefficient database query introduced in recent deployment
+    - Missing database index on frequently queried column
+  detection_signals:
+    - p95 latency spike from 40ms to 300ms
+    - Slow query logs showing 5x increase in query time
+    - Database CPU utilization increase
+  mitigation_strategies:
+    - Rollback to previous deployment version
+    - Add missing database index
+    - Optimize query with proper WHERE clause

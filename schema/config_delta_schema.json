@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ADAPT Config Delta Schema",
+  "description": "Schema for configuration changes in ADAPT-Data",
+  "type": "object",
+  "required": ["timestamp", "service", "change_type", "changes"],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the change occurred"
+    },
+    "service": {
+      "type": "string",
+      "description": "Service affected by the change"
+    },
+    "change_type": {
+      "type": "string",
+      "enum": ["deployment", "config_update", "scaling", "feature_flag", "secret_rotation", "cert_renewal"],
+      "description": "Type of configuration change"
+    },
+    "initiator": {
+      "type": "string",
+      "description": "Who or what initiated the change"
+    },
+    "changes": {
+      "type": "array",
+      "description": "List of specific changes",
+      "items": {
+        "type": "object",
+        "required": ["key", "old_value", "new_value"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Configuration key"
+          },
+          "old_value": {
+            "description": "Previous value"
+          },
+          "new_value": {
+            "description": "New value"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["performance", "security", "feature", "infrastructure", "other"]
+          }
+        }
+      }
+    },
+    "rollback_available": {
+      "type": "boolean",
+      "description": "Whether the change can be rolled back",
+      "default": true
+    }
+  }
+}

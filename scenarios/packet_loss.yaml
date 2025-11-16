@@ -1,0 +1,26 @@
+type: packet_loss
+description: Network degradation causing packet loss between services
+
+parameters:
+  affected_services:
+    - order-service
+    - inventory-service
+  packet_loss_percent: 15.0
+
+metadata:
+  category: network
+  common_causes:
+    - Network hardware failure
+    - Routing issues
+    - Firewall misconfiguration
+    - Region-to-region connectivity problems
+  detection_signals:
+    - Packet loss metrics spike
+    - TCP retransmit increase
+    - Connection timeouts
+    - Request retry increase
+  mitigation_strategies:
+    - Route around failed network
+    - Fix network hardware
+    - Update firewall rules
+    - Engage network team

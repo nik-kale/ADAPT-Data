@@ -1,0 +1,26 @@
+type: config_drift
+description: Configuration change reducing resource limits causing performance degradation
+
+parameters:
+  affected_service: payment-service
+  config_key: max_concurrent_transactions
+  old_value: 100
+  new_value: 10
+
+metadata:
+  category: configuration
+  common_causes:
+    - Accidental configuration change
+    - Auto-tuning gone wrong
+    - Copy-paste error
+    - Misunderstanding of setting
+  detection_signals:
+    - Resource pool exhaustion
+    - Queue depth increase
+    - Latency increase
+    - Config change event correlation
+  mitigation_strategies:
+    - Rollback configuration
+    - Review change history
+    - Implement config validation
+    - Add change approvals

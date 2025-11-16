@@ -1,0 +1,26 @@
+type: dependency_outage
+description: Complete database outage causing cascading service failures
+
+parameters:
+  failed_service: postgres-primary
+  dependent_services:
+    - user-service
+    - order-service
+    - payment-service
+
+metadata:
+  category: availability
+  common_causes:
+    - Infrastructure failure
+    - Resource exhaustion
+    - Disk full
+    - Network partition
+  detection_signals:
+    - Service health check failures
+    - Connection errors across multiple services
+    - 500 error rate spike
+  mitigation_strategies:
+    - Failover to replica
+    - Restart database
+    - Clear disk space
+    - Fix network partition

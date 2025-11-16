@@ -1,0 +1,25 @@
+type: bursty_noise
+description: Noisy neighbor causing intermittent resource contention
+
+parameters:
+  affected_service: user-service
+  burst_frequency_minutes: 5
+  burst_duration_seconds: 30
+
+metadata:
+  category: resource_contention
+  common_causes:
+    - Batch job running on same host
+    - Other tenant's workload spike
+    - Scheduled tasks
+    - Backup/maintenance operations
+  detection_signals:
+    - Intermittent CPU spikes
+    - High variance in latency metrics
+    - Periodic performance degradation
+    - GC pressure
+  mitigation_strategies:
+    - Move to dedicated resources
+    - Throttle batch jobs
+    - Add resource limits
+    - Scale out service

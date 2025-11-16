@@ -1,0 +1,25 @@
+type: latency_regression
+description: Database query regression causing elevated API latency
+
+parameters:
+  affected_service: order-service
+  baseline_latency_ms: 50.0
+  degraded_latency_ms: 500.0
+  error_threshold_ms: 1000.0
+
+metadata:
+  category: performance
+  common_causes:
+    - Inefficient database query
+    - Missing index
+    - N+1 query problem
+    - Increased data volume
+  detection_signals:
+    - p95 latency spike
+    - Slow query logs
+    - Database CPU increase
+  mitigation_strategies:
+    - Rollback deployment
+    - Add database index
+    - Optimize query
+    - Scale database

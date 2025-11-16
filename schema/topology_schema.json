@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ADAPT Topology Schema",
+  "description": "Schema for service topology and dependencies in ADAPT-Data",
+  "type": "object",
+  "required": ["services", "dependencies"],
+  "properties": {
+    "services": {
+      "type": "array",
+      "description": "List of services in the system",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Service name"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["api", "database", "cache", "queue", "frontend", "worker", "gateway", "auth", "storage"],
+            "description": "Service type"
+          },
+          "instances": {
+            "type": "integer",
+            "description": "Number of instances/replicas",
+            "minimum": 1,
+            "default": 1
+          },
+          "region": {
+            "type": "string",
+            "description": "Primary region"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional service metadata",
+            "properties": {
+              "version": {"type": "string"},
+              "owner": {"type": "string"},
+              "tier": {"type": "string", "enum": ["critical", "high", "medium", "low"]},
+              "sla_target": {"type": "number"}
+            }
+          }
+        }
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "Service dependency graph edges",
+      "items": {
+        "type": "object",
+        "required": ["from", "to"],
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Source service name"
+          },
+          "to": {
+            "type": "string",
+            "description": "Target service name"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["http", "grpc", "database", "cache", "queue", "storage"],
+            "description": "Dependency type"
+          },
+          "critical": {
+            "type": "boolean",
+            "description": "Whether this is a critical dependency",
+            "default": false
+          }
+        }
+      }
+    }
+  }
+}
