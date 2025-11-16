@@ -176,6 +176,20 @@ def main() -> int:
         help="Dataset directory"
     )
 
+    # Correlate command
+    correlate_parser = subparsers.add_parser(
+        "correlate",
+        help="Analyze correlations in dataset"
+    )
+    correlate_parser.add_argument(
+        "dataset_dir",
+        help="Dataset directory"
+    )
+    correlate_parser.add_argument(
+        "--output",
+        help="Export results to JSON file"
+    )
+
     args = parser.parse_args()
 
     if args.command == "generate":
@@ -237,6 +251,16 @@ def main() -> int:
     elif args.command == "info":
         from cli.utils import info
         return info(Path(args.dataset_dir))
+    elif args.command == "correlate":
+        from cli.correlate import analyze_correlations, print_correlation_report
+        import json
+        results = analyze_correlations(Path(args.dataset_dir))
+        print_correlation_report(results)
+        if args.output:
+            with open(args.output, 'w') as f:
+                json.dump(results, f, indent=2)
+            print(f"Results exported to: {args.output}")
+        return 0
     else:
         parser.print_help()
         return 1

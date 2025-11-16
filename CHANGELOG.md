@@ -2,6 +2,72 @@
 
 All notable changes to ADAPT-Data will be documented in this file.
 
+## [0.4.0] - 2025-01-16
+
+### Added - Advanced Features
+
+- **Progress Indicators**: Rich library integration for beautiful progress bars
+  - Spinner, bar, and time tracking for long operations
+  - Automatic fallback to logging if rich unavailable
+  - Context manager API: `get_progress_tracker().track()`
+
+- **Parameterized Distributions**: 7 probability distributions for realistic data
+  - Uniform, Normal, Exponential, LogNormal, Poisson, Weibull, Bimodal
+  - Distribution factory for easy configuration
+  - Predefined distributions for common metrics (latency, errors, throughput)
+
+- **Time-Series Patterns**: Realistic temporal behavior
+  - Seasonal patterns (daily, weekly, monthly cycles)
+  - Trend patterns (linear, exponential growth/decline)
+  - Burst patterns (periodic spikes)
+  - Cyclical and composite patterns
+  - Business hours, growth, and batch job patterns
+
+- **Difficulty Levels**: Progressive complexity for challenges
+  - 5 levels: Beginner, Easy, Medium, Hard, Expert
+  - Adaptive complexity configuration (services, incidents, noise, correlations)
+  - Scoring system with ranks (Novice to Master)
+  - Recommendation engine for next difficulty
+
+- **Configuration File System**: Centralized configuration management
+  - `.adapt-data.yaml` configuration files
+  - Hierarchical search (current → parent → home)
+  - Environment variable overrides (`ADAPT_LOG_LEVEL`, etc.)
+  - Sections: logging, generation, validation, export, advanced
+
+- **Correlation Analysis**: Intelligent data relationship detection
+  - Metric-metric correlations (Pearson)
+  - Temporal pattern detection (trends)
+  - Service error rate analysis
+  - Anomaly correlation tracking (log-metric relationships)
+  - New CLI command: `correlate`
+
+- **Plugin System Framework**: Extensibility architecture
+  - Three plugin types: Generators, Exporters, Analyzers
+  - Auto-discovery from `~/.adapt-data/plugins/`
+  - Plugin registry with lifecycle management
+  - Base classes for custom plugins
+
+### Enhanced
+
+- **CLI**: New commands and improved UX
+  - `correlate`: Analyze correlations in datasets
+  - Progress indicators in all long-running operations
+
+### Dependencies
+
+- **No new required dependencies**: All features degrade gracefully
+- **Optional**: `rich>=13.0` for progress bars (already in `[tui]`)
+
+### Documentation
+
+- **Added**: V0.4.0_IMPROVEMENTS.md - Comprehensive feature guide
+- **Updated**: Version to 0.4.0 in pyproject.toml
+
+### Breaking Changes
+
+- **None**: Fully backward compatible with v0.3.0
+
 ## [0.3.0] - 2025-01-16
 
 ### Added - Production-Ready Features
