@@ -59,9 +59,39 @@ class AuthFailureGenerator(BaseGenerator):
         self.baseline_error_rate = baseline_error_rate
         self.spike_error_rate = spike_error_rate
 
+        # Apply difficulty configuration if available
+        if hasattr(context, 'difficulty_config') and context.difficulty_config:
+            diff_config = context.difficulty_config
+
+            # Adjust noise level based on difficulty
+            noise_level = diff_config.noise_level
+
+            # Adjust complexity multipliers based on difficulty level
+            if diff_config.level.value == 'beginner':
+                # Reduce complexity for beginners
+                self.baseline_error_rate *= 0.5
+                self.spike_error_rate *= 0.7
+            elif diff_config.level.value == 'expert':
+                # Increase complexity for experts
+                self.baseline_error_rate *= 1.5
+                self.spike_error_rate *= 1.3
+
+            # Store log and metric multipliers for generation
+            self.log_volume_multiplier = diff_config.log_volume_multiplier
+            self.metric_density_multiplier = diff_config.metric_density / 3.0  # Base is ~3 metrics/min
+
+            logger.info(f"Applied {diff_config.level.value} difficulty adjustments: "
+                       f"baseline_error_rate={self.baseline_error_rate:.4f}, "
+                       f"spike_error_rate={self.spike_error_rate:.4f}, "
+                       f"noise_level={noise_level:.2f}")
+        else:
+            noise_level = 0.05
+            self.log_volume_multiplier = 1.0
+            self.metric_density_multiplier = 1.0
+
         # Time-series patterns for realistic data
         self.auth_rate_pattern = create_daily_pattern(amplitude=0.3)
-        self.metric_noise = NoisePattern(noise_level=0.05)
+        self.metric_noise = NoisePattern(noise_level=noise_level)
 
         context.affected_services = [affected_service, "api-gateway"]
         context.root_cause = f"Redis cache connection failures causing {affected_service} auth failures"
@@ -106,12 +136,9 @@ class AuthFailureGenerator(BaseGenerator):
             spike_duration=self.context.duration
         )
 
-        current_time = self.context.start_time - timedelta(minutes=30)
-        end_time = self.context.end_time + timedelta(minutes=30)
-
-        while current_time < end_time:
+        for current_time in self._iterate_time_window(step=timedelta(seconds=1)):
             for host in hosts:
-                if random.random() < 0.15:  # Auth requests
+                if self._should_generate_log(0.15 * self.log_volume_multiplier):  # Auth requests, adjusted by difficulty
                     should_error = injector.should_error(current_time)
 
                     if should_error:
@@ -153,8 +180,6 @@ class AuthFailureGenerator(BaseGenerator):
                             }
                         })
 
-            current_time += timedelta(seconds=1)
-
         return logs
 
     def _generate_metrics(self) -> list[dict[str, Any]]:
@@ -169,10 +194,7 @@ class AuthFailureGenerator(BaseGenerator):
             spike_duration=self.context.duration
         )
 
-        current_time = self.context.start_time - timedelta(minutes=30)
-        end_time = self.context.end_time + timedelta(minutes=30)
-
-        while current_time < end_time:
+        for current_time in self._iterate_time_window(step=timedelta(minutes=1)):
             for host in hosts:
                 error_rate = injector.get_error_rate(current_time)
                 is_anomaly = self.context.is_during_incident(current_time)
@@ -241,8 +263,6 @@ class AuthFailureGenerator(BaseGenerator):
                             "anomaly_injected": True
                         }
                     ])
-
-            current_time += timedelta(minutes=1)
 
         return metrics
 

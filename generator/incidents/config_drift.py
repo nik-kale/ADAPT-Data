@@ -60,13 +60,42 @@ class ConfigDriftGenerator(BaseGenerator):
         self.old_value = old_value
         self.new_value = new_value
 
+        # Apply difficulty configuration if available
+        if hasattr(context, 'difficulty_config') and context.difficulty_config:
+            diff_config = context.difficulty_config
+
+            # Adjust noise level based on difficulty
+            base_noise = diff_config.noise_level
+
+            # Adjust config values based on difficulty level
+            if diff_config.level.value == 'beginner':
+                # Make the change more obvious for beginners
+                ratio = self.new_value / self.old_value
+                self.new_value = int(self.old_value * (ratio * 0.7))  # More dramatic change
+            elif diff_config.level.value == 'expert':
+                # Make the change more subtle for experts
+                ratio = self.new_value / self.old_value
+                self.new_value = int(self.old_value * (ratio * 1.3))  # More subtle change
+
+            # Store log and metric multipliers for generation
+            self.log_volume_multiplier = diff_config.log_volume_multiplier
+            self.metric_density_multiplier = diff_config.metric_density / 3.0  # Base is ~3 metrics/min
+
+            logger.info(f"Applied {diff_config.level.value} difficulty adjustments: "
+                       f"config_change={self.old_value}->{self.new_value}, "
+                       f"noise_level={base_noise:.2f}")
+        else:
+            base_noise = 0.1
+            self.log_volume_multiplier = 1.0
+            self.metric_density_multiplier = 1.0
+
         context.affected_services = [affected_service]
         context.root_cause = f"Configuration change: {config_key} reduced from {old_value} to {new_value}"
 
         # Time-series patterns for realistic data
-        self.utilization_noise = NoisePattern(noise_level=0.08)
-        self.queue_noise = NoisePattern(noise_level=0.15)
-        self.latency_noise = NoisePattern(noise_level=0.10)
+        self.utilization_noise = NoisePattern(noise_level=base_noise * 0.8)
+        self.queue_noise = NoisePattern(noise_level=base_noise * 1.5)
+        self.latency_noise = NoisePattern(noise_level=base_noise)
 
     def generate(self) -> dict[str, Any]:
         """Generate complete incident dataset."""
@@ -102,14 +131,11 @@ class ConfigDriftGenerator(BaseGenerator):
         logs = []
         hosts = self._get_service_hosts(self.affected_service)
 
-        current_time = self.context.start_time - timedelta(minutes=30)
-        end_time = self.context.end_time + timedelta(minutes=30)
-
-        while current_time < end_time:
+        for current_time in self._iterate_time_window(step=timedelta(seconds=1)):
             is_during_incident = self.context.is_during_incident(current_time)
 
             for host in hosts:
-                if random.random() < 0.08:
+                if self._should_generate_log(0.08 * self.log_volume_multiplier):  # Adjusted by difficulty
                     if is_during_incident:
                         # Errors due to config limit
                         error_messages = [
@@ -143,8 +169,6 @@ class ConfigDriftGenerator(BaseGenerator):
                             }
                         })
 
-            current_time += timedelta(seconds=1)
-
         return logs
 
     def _generate_metrics(self) -> list[dict[str, Any]]:
@@ -152,10 +176,7 @@ class ConfigDriftGenerator(BaseGenerator):
         metrics = []
         hosts = self._get_service_hosts(self.affected_service)
 
-        current_time = self.context.start_time - timedelta(minutes=30)
-        end_time = self.context.end_time + timedelta(minutes=30)
-
-        while current_time < end_time:
+        for current_time in self._iterate_time_window(step=timedelta(minutes=1)):
             is_during_incident = self.context.is_during_incident(current_time)
 
             for host in hosts:
@@ -206,8 +227,6 @@ class ConfigDriftGenerator(BaseGenerator):
                         "anomaly_injected": is_during_incident
                     }
                 ])
-
-            current_time += timedelta(minutes=1)
 
         return metrics
 

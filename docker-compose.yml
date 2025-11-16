@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # ADAPT-Data generator service
+  adapt-data:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: adapt-data:0.4.0
+    container_name: adapt-data-generator
+    volumes:
+      - ./scenarios:/data/scenarios:ro
+      - ./output:/data/output
+      - ./plugins:/data/plugins:ro
+      - ./.adapt-data.yaml:/app/.adapt-data.yaml:ro
+    environment:
+      - ADAPT_OUTPUT_DIR=/data/output
+      - ADAPT_LOG_LEVEL=INFO
+      - ADAPT_ENABLE_PROGRESS=true
+    command: generate --scenario latency --duration 1h --output /data/output
+    restart: "no"
+
+  # Prometheus metrics server
+  adapt-metrics:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: adapt-data:0.4.0
+    container_name: adapt-data-metrics
+    volumes:
+      - ./output:/data/output:ro
+    ports:
+      - "9090:9090"
+    command: serve /data/output --port 9090 --replay-speed 1.0
+    restart: unless-stopped
+    depends_on:
+      - adapt-data
+
+  # Batch generation for multiple scenarios
+  adapt-batch:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: adapt-data:0.4.0
+    container_name: adapt-data-batch
+    volumes:
+      - ./scenarios:/data/scenarios:ro
+      - ./output:/data/output
+    environment:
+      - ADAPT_OUTPUT_DIR=/data/output
+      - ADAPT_RANDOM_SEED=42
+    command: >
+      sh -c "
+      adapt-data generate --scenario latency --duration 1h --difficulty beginner --output /data/output/beginner &&
+      adapt-data generate --scenario latency --duration 1h --difficulty expert --output /data/output/expert &&
+      adapt-data stats /data/output/beginner
+      "
+    restart: "no"
+
+# Example usage:
+#
+# # Generate single incident:
+# docker-compose up adapt-data
+#
+# # Serve metrics:
+# docker-compose up adapt-metrics
+#
+# # Batch generation:
+# docker-compose up adapt-batch
+#
+# # Build and run:
+# docker-compose build
+# docker-compose run adapt-data generate --scenario auth_failure --duration 2h
+#
+# # Interactive shell:
+# docker-compose run adapt-data bash
+#
+# # Run validation:
+# docker-compose run adapt-data validate /data/output

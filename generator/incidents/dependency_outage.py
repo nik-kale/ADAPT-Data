@@ -55,13 +55,41 @@ class DependencyOutageGenerator(BaseGenerator):
             "payment-service"
         ]
 
+        # Apply difficulty configuration if available
+        if hasattr(context, 'difficulty_config') and context.difficulty_config:
+            diff_config = context.difficulty_config
+
+            # Adjust noise level based on difficulty
+            noise_level = diff_config.noise_level
+
+            # Adjust number of dependent services based on difficulty
+            if diff_config.level.value == 'beginner':
+                # Reduce complexity for beginners - fewer dependent services
+                self.dependent_services = self.dependent_services[:2]
+            elif diff_config.level.value == 'expert':
+                # Increase complexity for experts - add more dependencies
+                if len(self.dependent_services) < 5:
+                    self.dependent_services.extend(["notification-service", "analytics-service"])
+
+            # Store log and metric multipliers for generation
+            self.log_volume_multiplier = diff_config.log_volume_multiplier
+            self.metric_density_multiplier = diff_config.metric_density / 3.0  # Base is ~3 metrics/min
+
+            logger.info(f"Applied {diff_config.level.value} difficulty adjustments: "
+                       f"dependent_services={len(self.dependent_services)}, "
+                       f"noise_level={noise_level:.2f}")
+        else:
+            noise_level = 0.05
+            self.log_volume_multiplier = 1.0
+            self.metric_density_multiplier = 1.0
+
         context.affected_services = [failed_service] + self.dependent_services
         context.root_cause = f"Complete outage of {failed_service} causing cascading failures"
 
         # Time-series patterns for realistic data
         self.request_pattern = create_daily_pattern(amplitude=0.25)
         self.connection_pattern = create_daily_pattern(amplitude=0.20)
-        self.metric_noise = NoisePattern(noise_level=0.05)
+        self.metric_noise = NoisePattern(noise_level=noise_level)
 
     def generate(self) -> dict[str, Any]:
         """Generate complete incident dataset."""
@@ -96,10 +124,7 @@ class DependencyOutageGenerator(BaseGenerator):
         """Generate log entries."""
         logs = []
 
-        current_time = self.context.start_time - timedelta(minutes=30)
-        end_time = self.context.end_time + timedelta(minutes=30)
-
-        while current_time < end_time:
+        for current_time in self._iterate_time_window(step=timedelta(seconds=1)):
             is_during_outage = self.context.is_during_incident(current_time)
 
             # Logs from failed service
@@ -120,7 +145,7 @@ class DependencyOutageGenerator(BaseGenerator):
             for service in self.dependent_services:
                 hosts = self._get_service_hosts(service)
                 for host in hosts:
-                    if random.random() < 0.05:
+                    if self._should_generate_log(0.05 * self.log_volume_multiplier):  # Adjusted by difficulty
                         if is_during_outage:
                             error_messages = [
                                 f"Failed to connect to {self.failed_service}",
@@ -153,18 +178,13 @@ class DependencyOutageGenerator(BaseGenerator):
                                 }
                             })
 
-            current_time += timedelta(seconds=1)
-
         return logs
 
     def _generate_metrics(self) -> list[dict[str, Any]]:
         """Generate metrics."""
         metrics = []
 
-        current_time = self.context.start_time - timedelta(minutes=30)
-        end_time = self.context.end_time + timedelta(minutes=30)
-
-        while current_time < end_time:
+        for current_time in self._iterate_time_window(step=timedelta(minutes=1)):
             is_during_outage = self.context.is_during_incident(current_time)
 
             # Failed service metrics
@@ -220,8 +240,6 @@ class DependencyOutageGenerator(BaseGenerator):
                             "anomaly_injected": is_during_outage
                         }
                     ])
-
-            current_time += timedelta(minutes=1)
 
         return metrics
 

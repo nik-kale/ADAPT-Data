@@ -52,6 +52,11 @@ def _main_impl() -> int:
         default=config.generation.default_severity,
         help=f"Incident severity (default: {config.generation.default_severity})"
     )
+    gen_parser.add_argument(
+        "--difficulty",
+        choices=["beginner", "easy", "medium", "hard", "expert"],
+        help="Challenge difficulty level (affects complexity, noise, correlations)"
+    )
 
     # Validate command
     val_parser = subparsers.add_parser(
@@ -212,6 +217,7 @@ def _main_impl() -> int:
             output_dir=Path(args.output),
             duration=args.duration,
             severity=args.severity,
+            difficulty=args.difficulty,
             global_config=config
         )
     elif args.command == "validate":

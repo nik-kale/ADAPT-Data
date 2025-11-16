@@ -33,13 +33,14 @@ def run_wizard() -> dict[str, Any]:
         ("config_drift", "Configuration change causes issues"),
         ("packet_loss", "Network degradation between services"),
         ("bursty_noise", "Intermittent resource contention"),
+        ("cascade", "Multiple cascading incidents"),
     ]
 
     for i, (name, desc) in enumerate(types, 1):
         logger.info(f"  {i}. {name}: {desc}")
 
     while True:
-        choice = input("\nSelect incident type (1-6): ").strip()
+        choice = input("\nSelect incident type (1-7): ").strip()
         try:
             idx = int(choice) - 1
             if 0 <= idx < len(types):
@@ -47,7 +48,7 @@ def run_wizard() -> dict[str, Any]:
                 break
         except ValueError:
             pass
-        logger.error("Invalid choice. Please enter a number 1-6.")
+        logger.error("Invalid choice. Please enter a number 1-7.")
 
     # Get description
     config["description"] = input("\nIncident description: ").strip() or "Custom incident scenario"
@@ -84,6 +85,31 @@ def run_wizard() -> dict[str, Any]:
     elif config["type"] == "bursty_noise":
         logger.info("\n--- Bursty Noise Parameters ---")
         config["parameters"]["affected_service"] = input("Affected service (default: user-service): ").strip() or "user-service"
+
+    elif config["type"] == "cascade":
+        logger.info("\n--- Cascade Incident Configuration ---")
+        num_incidents = input("Number of cascading incidents (2-5, default: 3): ").strip() or "3"
+
+        # Validate number of incidents
+        try:
+            num_incidents_int = int(num_incidents)
+            if num_incidents_int < 2 or num_incidents_int > 5:
+                logger.warning("Number of incidents should be between 2-5. Using default: 3")
+                num_incidents_int = 3
+        except ValueError:
+            logger.warning("Invalid number. Using default: 3")
+            num_incidents_int = 3
+
+        config["parameters"]["num_incidents"] = num_incidents_int
+
+        cascade_delay = input("Delay between incidents in minutes (default: 10): ").strip() or "10"
+        try:
+            config["parameters"]["cascade_delay_minutes"] = int(cascade_delay)
+        except ValueError:
+            logger.warning("Invalid delay. Using default: 10")
+            config["parameters"]["cascade_delay_minutes"] = 10
+
+        config["parameters"]["affected_services"] = input("Initial affected service (default: payment-service): ").strip() or "payment-service"
 
     # Metadata
     logger.info("\n--- Additional Configuration ---")
@@ -137,6 +163,7 @@ def _get_category(incident_type: str) -> str:
         "config_drift": "configuration",
         "packet_loss": "network",
         "bursty_noise": "resource_contention",
+        "cascade": "complex",
     }
     return categories.get(incident_type, "other")
 

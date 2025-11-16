@@ -58,13 +58,40 @@ class PacketLossGenerator(BaseGenerator):
         self.affected_services = affected_services or ["order-service", "inventory-service"]
         self.packet_loss_percent = packet_loss_percent
 
+        # Apply difficulty configuration if available
+        if hasattr(context, 'difficulty_config') and context.difficulty_config:
+            diff_config = context.difficulty_config
+
+            # Adjust noise level based on difficulty
+            base_noise = diff_config.noise_level
+
+            # Adjust packet loss percentage based on difficulty level
+            if diff_config.level.value == 'beginner':
+                # More obvious packet loss for beginners
+                self.packet_loss_percent *= 1.3
+            elif diff_config.level.value == 'expert':
+                # More subtle packet loss for experts
+                self.packet_loss_percent *= 0.7
+
+            # Store log and metric multipliers for generation
+            self.log_volume_multiplier = diff_config.log_volume_multiplier
+            self.metric_density_multiplier = diff_config.metric_density / 3.0  # Base is ~3 metrics/min
+
+            logger.info(f"Applied {diff_config.level.value} difficulty adjustments: "
+                       f"packet_loss={self.packet_loss_percent:.1f}%, "
+                       f"noise_level={base_noise:.2f}")
+        else:
+            base_noise = 0.12
+            self.log_volume_multiplier = 1.0
+            self.metric_density_multiplier = 1.0
+
         context.affected_services = self.affected_services
         context.root_cause = f"Network degradation causing {packet_loss_percent}% packet loss between services"
 
         # Time-series patterns for realistic data
-        self.network_noise = NoisePattern(noise_level=0.12)
-        self.retransmit_noise = NoisePattern(noise_level=0.10)
-        self.latency_noise = NoisePattern(noise_level=0.15)
+        self.network_noise = NoisePattern(noise_level=base_noise)
+        self.retransmit_noise = NoisePattern(noise_level=base_noise * 0.8)
+        self.latency_noise = NoisePattern(noise_level=base_noise * 1.2)
 
     def generate(self) -> dict[str, Any]:
         """Generate complete incident dataset."""
@@ -98,17 +125,14 @@ class PacketLossGenerator(BaseGenerator):
         """Generate log entries."""
         logs = []
 
-        current_time = self.context.start_time - timedelta(minutes=30)
-        end_time = self.context.end_time + timedelta(minutes=30)
-
-        while current_time < end_time:
+        for current_time in self._iterate_time_window(step=timedelta(seconds=1)):
             is_during_incident = self.context.is_during_incident(current_time)
 
             for service in self.affected_services:
                 hosts = self._get_service_hosts(service)
                 for host in hosts:
-                    if random.random() < 0.06:
-                        if is_during_incident and random.random() < (self.packet_loss_percent / 100):
+                    if self._should_generate_log(0.06 * self.log_volume_multiplier):  # Adjusted by difficulty
+                        if is_during_incident and self._should_generate_log(self.packet_loss_percent / 100):
                             # Network errors
                             error_messages = [
                                 "Connection timeout to downstream service",
@@ -141,18 +165,13 @@ class PacketLossGenerator(BaseGenerator):
                                 }
                             })
 
-            current_time += timedelta(seconds=1)
-
         return logs
 
     def _generate_metrics(self) -> list[dict[str, Any]]:
         """Generate metrics."""
         metrics = []
 
-        current_time = self.context.start_time - timedelta(minutes=30)
-        end_time = self.context.end_time + timedelta(minutes=30)
-
-        while current_time < end_time:
+        for current_time in self._iterate_time_window(step=timedelta(minutes=1)):
             is_during_incident = self.context.is_during_incident(current_time)
 
             for service in self.affected_services:
@@ -211,8 +230,6 @@ class PacketLossGenerator(BaseGenerator):
                             "anomaly_injected": is_during_incident
                         }
                     ])
-
-            current_time += timedelta(minutes=1)
 
         return metrics
 

@@ -58,9 +58,41 @@ class LatencyRegressionGenerator(BaseGenerator):
         self.degraded_latency_ms = degraded_latency_ms
         self.error_threshold_ms = error_threshold_ms
 
+        # Apply difficulty configuration if available
+        if hasattr(context, 'difficulty_config') and context.difficulty_config:
+            diff_config = context.difficulty_config
+
+            # Adjust noise level based on difficulty
+            noise_level = diff_config.noise_level
+
+            # Adjust complexity multipliers based on difficulty level
+            if diff_config.level.value == 'beginner':
+                # Reduce complexity for beginners
+                self.baseline_latency_ms *= 0.7
+                self.degraded_latency_ms *= 0.7
+                self.error_threshold_ms *= 0.8
+            elif diff_config.level.value == 'expert':
+                # Increase complexity for experts
+                self.baseline_latency_ms *= 1.3
+                self.degraded_latency_ms *= 1.5
+                self.error_threshold_ms *= 1.2
+
+            # Store log and metric multipliers for generation
+            self.log_volume_multiplier = diff_config.log_volume_multiplier
+            self.metric_density_multiplier = diff_config.metric_density / 3.0  # Base is ~3 metrics/min
+
+            logger.info(f"Applied {diff_config.level.value} difficulty adjustments: "
+                       f"baseline_latency={self.baseline_latency_ms:.1f}ms, "
+                       f"degraded_latency={self.degraded_latency_ms:.1f}ms, "
+                       f"noise_level={noise_level:.2f}")
+        else:
+            noise_level = 0.05
+            self.log_volume_multiplier = 1.0
+            self.metric_density_multiplier = 1.0
+
         # Time-series patterns for realistic data
         self.request_rate_pattern = create_business_hours_pattern()
-        self.latency_noise = NoisePattern(noise_level=0.05)
+        self.latency_noise = NoisePattern(noise_level=noise_level)
 
         # Update context
         context.affected_services = [affected_service]
@@ -120,7 +152,7 @@ class LatencyRegressionGenerator(BaseGenerator):
         for current_time in self._iterate_time_window(step=timedelta(seconds=1)):
             # Request frequency: varies with business hours pattern
             for host in hosts:
-                base_rate = 0.1  # Base 10% of time slots
+                base_rate = 0.1 * self.log_volume_multiplier  # Base 10% of time slots, adjusted by difficulty
                 request_rate = self.request_rate_pattern.apply(base_rate, current_time)
                 if self._should_generate_log(request_rate):
                     latency = injector.get_latency(current_time)
