@@ -4,6 +4,16 @@ jsonschema>=4.17.0
 numpy>=1.24.0  # For statistical distributions
 pydantic>=2.0.0  # For input validation
 
+# OpenTelemetry dependencies (v2.0)
+opentelemetry-api>=1.20.0
+opentelemetry-sdk>=1.20.0
+opentelemetry-exporter-otlp>=1.20.0
+opentelemetry-exporter-otlp-proto-grpc>=1.20.0
+opentelemetry-exporter-otlp-proto-http>=1.20.0
+
+# Prometheus client (optional, for serving metrics)
+prometheus-client>=0.19.0
+
 # Development dependencies (install with: pip install -e ".[dev]")
 # pytest>=7.0
 # pytest-cov>=4.0
@@ -11,3 +21,5 @@ pydantic>=2.0.0  # For input validation
 # black>=23.0
 # mypy>=1.0
 # ruff>=0.1.0
+# bandit>=1.7.0  # Security scanner
+# safety>=2.3.0  # Dependency vulnerability scanner

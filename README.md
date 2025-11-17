@@ -4,12 +4,21 @@
 
 ## Features
 
+### Core Capabilities
 - 🎯 **6 Incident Types**: Latency regression, auth failures, dependency outages, config drift, packet loss, and bursty noise
 - 📊 **Rich Telemetry**: Generates logs, metrics, traces, config changes, and incident timelines
 - 🔄 **Reproducible**: YAML-based scenario definitions for consistent dataset generation
 - ✅ **Schema-Validated**: JSON schemas for all data types with built-in validation
 - 🏗️ **Topology-Aware**: Service dependency graphs with realistic microservices architectures
 - 🚀 **Production-Quality**: Fully typed Python codebase with comprehensive error handling
+
+### v2.0 - OpenTelemetry Integration (NEW!)
+- 🔌 **OTLP Export**: Full OpenTelemetry Protocol support for logs, metrics, traces
+- 📈 **Profiling Data**: CPU, memory, heap, and goroutine profiling generation
+- 🏷️ **Semantic Conventions**: OpenTelemetry semantic conventions compliance
+- 🌐 **Multi-Format Export**: Jaeger, Zipkin, Prometheus, OTLP formats
+- ⚙️ **OTEL Collector**: Auto-generate collector configurations
+- 🤖 **GenAI Support**: Semantic conventions for LLM observability
 
 ## Quick Start
 
