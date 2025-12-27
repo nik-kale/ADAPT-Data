@@ -48,6 +48,24 @@ python -m cli.main validate ./my_incident
 python -m cli.main list-scenarios
 ```
 
+### Visualize Incidents with Grafana
+
+Pre-built Grafana dashboards for instant visualization:
+
+```bash
+# Start Grafana + Prometheus
+cd dashboards/
+docker-compose -f docker-compose.grafana.yml up -d
+
+# Serve generated metrics
+python -m cli.main serve ./my_incident --port 8000
+
+# Open http://localhost:3000 (admin/adapt-data)
+# Dashboards are auto-loaded in the "ADAPT-Data" folder
+```
+
+See [dashboards/README.md](dashboards/README.md) for details.
+
 ### Streaming Mode for Large Datasets
 
 For long-duration incidents or high-frequency metrics that produce millions of records, use streaming mode to avoid memory exhaustion:
