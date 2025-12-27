@@ -193,6 +193,40 @@ dependencies:
 
 See [topology/README.md](topology/README.md) for details.
 
+## Exporting to Observability Platforms
+
+### Datadog
+
+```bash
+# Export all telemetry to Datadog format
+python -m cli.main export ./my_incident --format datadog --output ./datadog_export/
+
+# Export specific data types
+python -m cli.main export ./my_incident --format datadog --output ./datadog_metrics.json
+python -m cli.main export ./my_incident --format datadog --output ./datadog_logs.json
+python -m cli.main export ./my_incident --format datadog --output ./datadog_traces.json
+```
+
+### Prometheus
+
+```bash
+# Export to Prometheus text format
+python -m cli.main export ./my_incident --format prometheus --output ./metrics.txt
+
+# Serve metrics via HTTP for Prometheus scraping
+python -m cli.main serve ./my_incident --port 9090
+```
+
+### OpenTelemetry
+
+```bash
+# Export metrics
+python -m cli.main export ./my_incident --format opentelemetry --output ./otlp_metrics.json
+
+# Export traces
+python -m cli.main export ./my_incident --format opentelemetry --output ./otlp_traces.json
+```
+
 ## Integration with ADAPT Ecosystem
 
 ### With ADAPT-RCA
