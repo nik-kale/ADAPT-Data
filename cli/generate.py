@@ -26,6 +26,7 @@ from generator.incidents.config_drift import ConfigDriftGenerator
 from generator.incidents.packet_loss import PacketLossGenerator
 from generator.incidents.bursty_noise import BurstyNoiseGenerator
 from generator.incidents.cascade import CascadeGenerator
+from generator.incidents.memory_leak import MemoryLeakGenerator
 
 logger = get_logger(__name__)
 
@@ -38,6 +39,7 @@ GENERATOR_MAP = {
     "packet_loss": PacketLossGenerator,
     "bursty_noise": BurstyNoiseGenerator,
     "cascade": CascadeGenerator,
+    "memory_leak": MemoryLeakGenerator,
 }
 
 

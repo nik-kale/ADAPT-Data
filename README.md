@@ -4,7 +4,7 @@
 
 ## Features
 
-- 🎯 **6 Incident Types**: Latency regression, auth failures, dependency outages, config drift, packet loss, and bursty noise
+- 🎯 **7 Incident Types**: Latency regression, auth failures, dependency outages, config drift, packet loss, bursty noise, and memory leaks
 - 📊 **Rich Telemetry**: Generates logs, metrics, traces, config changes, and incident timelines
 - 🔄 **Reproducible**: YAML-based scenario definitions for consistent dataset generation
 - ✅ **Schema-Validated**: JSON schemas for all data types with built-in validation
@@ -119,6 +119,11 @@ Network degradation between services or regions.
 Intermittent resource contention from noisy neighbors.
 - **Signals**: Periodic CPU spikes, high latency variance
 - **Root Causes**: Batch jobs, scheduled tasks, other tenants
+
+### 7. Memory Leak
+Gradual memory exhaustion leading to OOM events.
+- **Signals**: Growing heap usage, increased GC pressure, container restarts
+- **Root Causes**: Unclosed connections, cache eviction failures, object retention
 
 ## Generated Data Structure
 

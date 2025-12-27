@@ -1,0 +1,43 @@
+type: memory_leak
+description: Memory leak causing gradual heap exhaustion and OOM events
+
+parameters:
+  affected_service: api-server
+  leak_rate_mb_per_min: 10.0
+  initial_memory_mb: 512.0
+  max_memory_mb: 2048.0
+  leak_pattern: gradual  # Options: gradual, rapid
+
+metadata:
+  category: resource_exhaustion
+  severity_range: [SEV2, SEV1]
+  difficulty: medium
+  
+  common_causes:
+    - Unclosed database connections
+    - Growing in-memory cache without eviction
+    - Event listener leaks
+    - Thread-local storage accumulation
+    - Large object retention in collections
+    
+  detection_signals:
+    - Gradual memory usage increase
+    - Increased GC frequency and duration
+    - Reduced application throughput
+    - OutOfMemoryError in logs
+    - Container restarts with OOMKilled status
+    
+  investigation_steps:
+    - Check memory usage trends over time
+    - Analyze GC logs for increased pressure
+    - Review heap dumps for retained objects
+    - Identify object allocation hot paths
+    - Check for connection pool exhaustion
+    
+  mitigation_strategies:
+    - Restart affected containers (temporary)
+    - Increase memory limits (temporary)
+    - Deploy fix for leak source
+    - Implement circuit breakers
+    - Add memory usage alerts
+
