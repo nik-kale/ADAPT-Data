@@ -220,7 +220,9 @@ def generate_incident(
 
         # Generate topology
         with tracker.track("Generating topology", total=1):
-            topo_gen = TopologyGenerator(context)
+            # Check if scenario specifies custom topology
+            topology_file = scenario_config.get("topology")
+            topo_gen = TopologyGenerator(context, topology_file=topology_file)
             topology = topo_gen.generate()
             context.topology = topology
 
