@@ -57,6 +57,11 @@ def _main_impl() -> int:
         choices=["beginner", "easy", "medium", "hard", "expert"],
         help="Challenge difficulty level (affects complexity, noise, correlations)"
     )
+    gen_parser.add_argument(
+        "--streaming",
+        action="store_true",
+        help="Enable streaming output for large datasets (reduces memory usage)"
+    )
 
     # Validate command
     val_parser = subparsers.add_parser(
@@ -218,6 +223,7 @@ def _main_impl() -> int:
             duration=args.duration,
             severity=args.severity,
             difficulty=args.difficulty,
+            streaming=args.streaming,
             global_config=config
         )
     elif args.command == "validate":

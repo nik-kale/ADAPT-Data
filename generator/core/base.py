@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from generator.core.utils import generate_uuid, timestamp_to_iso
+from generator.core.streaming import StreamingJSONLWriter
 
 
 @dataclass
@@ -27,6 +28,7 @@ class IncidentContext:
         output_dir: Directory to write output files
         topology: System topology definition
         scenario_config: Additional scenario configuration
+        streaming: Enable streaming output for large datasets
     """
 
     incident_id: str = field(default_factory=lambda: generate_uuid())
@@ -39,6 +41,7 @@ class IncidentContext:
     output_dir: Path = field(default=Path("./output"))
     topology: dict[str, Any] = field(default_factory=dict)
     scenario_config: dict[str, Any] = field(default_factory=dict)
+    streaming: bool = field(default=False)
 
     def __post_init__(self) -> None:
         """Initialize computed fields."""
@@ -155,6 +158,42 @@ class BaseGenerator(ABC):
                 f.write(json.dumps(record, default=str) + '\n')
 
         return filepath
+
+    def create_streaming_writer(
+        self,
+        filename: str,
+        subdir: str = "",
+        buffer_size: int = 1000
+    ) -> StreamingJSONLWriter:
+        """Create a streaming JSONL writer for memory-efficient generation.
+
+        Use this for large datasets to avoid memory exhaustion. Records
+        are written incrementally to disk as they're generated.
+
+        Args:
+            filename: Output filename
+            subdir: Optional subdirectory
+            buffer_size: Records to buffer before flushing to disk
+
+        Returns:
+            StreamingJSONLWriter instance
+
+        Example:
+            ```python
+            with self.create_streaming_writer("metrics.jsonl", "metrics") as writer:
+                for timestamp in self._iterate_time_window():
+                    metric = self._generate_metric(timestamp)
+                    writer.write(metric)
+            # Automatically flushed and closed
+            ```
+        """
+        output_path = self.context.output_dir
+        if subdir:
+            output_path = output_path / subdir
+            output_path.mkdir(parents=True, exist_ok=True)
+
+        filepath = output_path / filename
+        return StreamingJSONLWriter(filepath, buffer_size=buffer_size)
 
     def _get_service_hosts(self, service_name: str) -> list[str]:
         """Get list of host identifiers for a service.

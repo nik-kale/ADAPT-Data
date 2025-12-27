@@ -10,6 +10,7 @@
 - ✅ **Schema-Validated**: JSON schemas for all data types with built-in validation
 - 🏗️ **Topology-Aware**: Service dependency graphs with realistic microservices architectures
 - 🚀 **Production-Quality**: Fully typed Python codebase with comprehensive error handling
+- 💾 **Streaming Mode**: Memory-efficient generation for large datasets (millions of records)
 
 ## Quick Start
 
@@ -46,6 +47,28 @@ python -m cli.main validate ./my_incident
 ```bash
 python -m cli.main list-scenarios
 ```
+
+### Streaming Mode for Large Datasets
+
+For long-duration incidents or high-frequency metrics that produce millions of records, use streaming mode to avoid memory exhaustion:
+
+```bash
+# Generate with streaming enabled (memory-efficient)
+python -m cli.main generate \
+  --scenario latency_regression \
+  --output ./large_incident \
+  --duration 24h \
+  --streaming
+
+# Streaming mode uses constant memory regardless of dataset size
+# Suitable for datasets > 100MB or > 1M records
+```
+
+**When to use streaming mode:**
+- Dataset duration > 12 hours
+- High-frequency metric generation (< 1 second intervals)
+- Limited system memory
+- Generating multiple datasets in parallel
 
 ## Incident Types
 

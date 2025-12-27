@@ -79,6 +79,7 @@ def generate_incident(
     duration: str,
     severity: str,
     difficulty: Optional[str] = None,
+    streaming: bool = False,
     global_config: Optional[AdaptDataConfig] = None
 ) -> int:
     """Generate incident dataset.
@@ -89,6 +90,7 @@ def generate_incident(
         duration: Duration string (e.g., "1h")
         severity: Severity level
         difficulty: Difficulty level (beginner, easy, medium, hard, expert)
+        streaming: Enable streaming output for large datasets
         global_config: Global ADAPT-Data configuration
 
     Returns:
@@ -194,8 +196,12 @@ def generate_incident(
                 duration=duration_td,
                 severity=severity,
                 output_dir=output_dir_abs,
-                scenario_config=scenario_config
+                scenario_config=scenario_config,
+                streaming=streaming
             )
+
+            if streaming:
+                logger.info("Streaming mode enabled - using memory-efficient incremental writes")
 
             # Apply difficulty configuration if provided
             if difficulty:
