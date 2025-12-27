@@ -22,6 +22,7 @@ class LoggingConfig(BaseModel):
     level: str = Field(default="INFO", description="Log level")
     enable_colors: bool = Field(default=True, description="Enable colored output")
     log_file: Optional[str] = Field(default=None, description="Log file path")
+    log_format: str = Field(default="text", description="Log format (text or json)")
 
 
 class GenerationConfig(BaseModel):
