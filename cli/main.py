@@ -117,7 +117,7 @@ def _main_impl() -> int:
     export_parser.add_argument(
         "--format",
         default=config.export.default_format,
-        help=f"Export format: opentelemetry, prometheus, or plugin name (default: {config.export.default_format})"
+        help=f"Export format: opentelemetry, prometheus, datadog, or plugin name (default: {config.export.default_format})"
     )
     export_parser.add_argument(
         "--output",
@@ -264,6 +264,19 @@ def _main_impl() -> int:
             from generator.exporters.prometheus import PrometheusExporter
             exporter = PrometheusExporter(dataset_dir)
             exporter.export_text_format(Path(args.output))
+        elif args.format == "datadog":
+            from generator.exporters.datadog import DatadogExporter
+            exporter = DatadogExporter(dataset_dir)
+            # Export based on output filename
+            if "metrics" in args.output:
+                exporter.export_metrics(Path(args.output))
+            elif "logs" in args.output:
+                exporter.export_logs(Path(args.output))
+            elif "traces" in args.output:
+                exporter.export_traces(Path(args.output))
+            else:
+                # Export all to directory
+                exporter.export_all(Path(args.output))
         else:
             # Try plugin exporters
             plugin_exporter = plugin_registry.get_exporter(args.format)
@@ -272,7 +285,7 @@ def _main_impl() -> int:
                 plugin_exporter.export(dataset_dir, Path(args.output))
             else:
                 logger.error(f"Unknown export format: {args.format}")
-                logger.info("Available formats: opentelemetry, prometheus, or custom plugin exporters")
+                logger.info("Available formats: opentelemetry, prometheus, datadog, or custom plugin exporters")
                 return 1
         return 0
     elif args.command == "serve":
