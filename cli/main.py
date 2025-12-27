@@ -9,12 +9,22 @@ from cli.generate import generate_incident
 from cli.validate import validate_dataset
 from generator.core.config import get_config
 from generator.core.plugins import get_plugin_registry
+from generator.core.logging_config import setup_logging
+import os
 
 
 def _main_impl() -> int:
     """Main CLI implementation."""
     # Load configuration early
     config = get_config()
+
+    # Configure logging based on config and environment
+    log_format = os.environ.get('ADAPT_LOG_FORMAT', config.logging.log_format)
+    setup_logging(
+        level=getattr(__import__('logging'), config.logging.level.upper()),
+        enable_colors=config.logging.enable_colors,
+        log_format=log_format
+    )
 
     # Load plugins early
     plugin_registry = get_plugin_registry()

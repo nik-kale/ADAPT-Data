@@ -88,6 +88,32 @@ python -m cli.main generate \
 - Limited system memory
 - Generating multiple datasets in parallel
 
+### Structured JSON Logging
+
+For CI/CD pipelines and log aggregation systems:
+
+```bash
+# Enable JSON logging via environment variable
+export ADAPT_LOG_FORMAT=json
+python -m cli.main generate --scenario latency_regression --output ./output
+
+# Or configure in .adapt-data.yaml
+# logging:
+#   log_format: json
+```
+
+**JSON log format:**
+```json
+{
+  "timestamp": "2025-12-26T10:30:45.123Z",
+  "level": "INFO",
+  "logger": "adapt_data.generator",
+  "message": "Generating incident...",
+  "function": "generate",
+  "line": 42
+}
+```
+
 ## Incident Types
 
 ### 1. Latency Regression
