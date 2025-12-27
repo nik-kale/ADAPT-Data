@@ -1,0 +1,187 @@
+name: fintech-platform
+version: "1.0"
+description: Financial services microservices architecture with compliance and fraud detection
+
+services:
+  - name: api-gateway
+    type: gateway
+    instances: 5
+    region: us-east-1
+    metadata:
+      version: "2.0.0"
+      tier: critical
+      sla_target: 99.99
+
+  - name: auth-service
+    type: auth
+    instances: 3
+    region: us-east-1
+    metadata:
+      version: "3.2.1"
+      tier: critical
+      sla_target: 99.99
+
+  - name: account-service
+    type: api
+    instances: 6
+    region: us-east-1
+    metadata:
+      version: "4.1.0"
+      tier: critical
+      sla_target: 99.99
+
+  - name: transaction-service
+    type: api
+    instances: 8
+    region: us-east-1
+    metadata:
+      version: "5.3.2"
+      tier: critical
+      sla_target: 99.99
+
+  - name: fraud-detection
+    type: api
+    instances: 4
+    region: us-east-1
+    metadata:
+      version: "2.5.0"
+      tier: critical
+      sla_target: 99.95
+
+  - name: compliance-service
+    type: api
+    instances: 2
+    region: us-east-1
+    metadata:
+      version: "1.8.1"
+      tier: high
+      sla_target: 99.9
+
+  - name: notification-service
+    type: api
+    instances: 3
+    region: us-east-1
+    metadata:
+      version: "2.0.5"
+      tier: medium
+      sla_target: 99.5
+
+  - name: postgres-primary
+    type: database
+    instances: 1
+    region: us-east-1
+    metadata:
+      version: "15.2"
+      tier: critical
+      sla_target: 99.99
+
+  - name: postgres-replica
+    type: database
+    instances: 2
+    region: us-east-1
+    metadata:
+      version: "15.2"
+      tier: high
+      sla_target: 99.9
+
+  - name: redis-cache
+    type: cache
+    instances: 3
+    region: us-east-1
+    metadata:
+      version: "7.0.10"
+      tier: critical
+      sla_target: 99.95
+
+  - name: kafka-broker
+    type: queue
+    instances: 3
+    region: us-east-1
+    metadata:
+      version: "3.4.0"
+      tier: critical
+      sla_target: 99.95
+
+dependencies:
+  # Gateway dependencies
+  - from: api-gateway
+    to: auth-service
+    type: http
+    critical: true
+
+  - from: api-gateway
+    to: account-service
+    type: http
+    critical: true
+
+  - from: api-gateway
+    to: transaction-service
+    type: http
+    critical: true
+
+  # Account service dependencies
+  - from: account-service
+    to: postgres-primary
+    type: database
+    critical: true
+
+  - from: account-service
+    to: redis-cache
+    type: cache
+    critical: true
+
+  # Transaction service dependencies
+  - from: transaction-service
+    to: postgres-primary
+    type: database
+    critical: true
+
+  - from: transaction-service
+    to: fraud-detection
+    type: http
+    critical: true
+
+  - from: transaction-service
+    to: compliance-service
+    type: http
+    critical: true
+
+  - from: transaction-service
+    to: kafka-broker
+    type: queue
+    critical: true
+
+  # Fraud detection dependencies
+  - from: fraud-detection
+    to: postgres-replica
+    type: database
+    critical: false
+
+  - from: fraud-detection
+    to: redis-cache
+    type: cache
+    critical: true
+
+  # Compliance service dependencies
+  - from: compliance-service
+    to: postgres-primary
+    type: database
+    critical: true
+
+  # Notification service dependencies
+  - from: notification-service
+    to: kafka-broker
+    type: queue
+    critical: true
+
+  # Auth service dependencies
+  - from: auth-service
+    to: postgres-primary
+    type: database
+    critical: true
+
+  - from: auth-service
+    to: redis-cache
+    type: cache
+    critical: true
+

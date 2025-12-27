@@ -150,6 +150,7 @@ Create a YAML file in `scenarios/`:
 ```yaml
 type: latency_regression
 description: Custom latency incident
+topology: fintech  # Optional: use custom topology
 
 parameters:
   affected_service: my-service
@@ -169,6 +170,28 @@ Then generate:
 ```bash
 python -m cli.main generate --scenario my_custom_scenario --output ./output
 ```
+
+### Custom Topologies
+
+Model your actual production architecture:
+
+```yaml
+# topology/my-platform.yaml
+name: my-platform
+services:
+  - name: api-gateway
+    type: gateway
+    instances: 3
+    region: us-east-1
+
+dependencies:
+  - from: api-gateway
+    to: user-service
+    type: http
+    critical: true
+```
+
+See [topology/README.md](topology/README.md) for details.
 
 ## Integration with ADAPT Ecosystem
 

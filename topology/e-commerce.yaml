@@ -1,0 +1,178 @@
+name: e-commerce-platform
+version: "1.0"
+description: Standard e-commerce microservices architecture
+
+services:
+  - name: api-gateway
+    type: gateway
+    instances: 3
+    region: us-east-1
+    metadata:
+      version: "1.2.3"
+      tier: critical
+      sla_target: 99.9
+
+  - name: auth-service
+    type: auth
+    instances: 2
+    region: us-east-1
+    metadata:
+      version: "2.1.0"
+      tier: critical
+      sla_target: 99.99
+
+  - name: user-service
+    type: api
+    instances: 4
+    region: us-east-1
+    metadata:
+      version: "3.0.1"
+      tier: high
+      sla_target: 99.9
+
+  - name: order-service
+    type: api
+    instances: 4
+    region: us-east-1
+    metadata:
+      version: "1.5.2"
+      tier: critical
+      sla_target: 99.95
+
+  - name: payment-service
+    type: api
+    instances: 3
+    region: us-east-1
+    metadata:
+      version: "2.3.1"
+      tier: critical
+      sla_target: 99.99
+
+  - name: inventory-service
+    type: api
+    instances: 2
+    region: us-east-1
+    metadata:
+      version: "1.8.0"
+      tier: high
+      sla_target: 99.5
+
+  - name: notification-worker
+    type: worker
+    instances: 2
+    region: us-east-1
+    metadata:
+      version: "1.1.0"
+      tier: medium
+      sla_target: 99.0
+
+  - name: postgres-primary
+    type: database
+    instances: 1
+    region: us-east-1
+    metadata:
+      version: "14.5"
+      tier: critical
+      sla_target: 99.99
+
+  - name: redis-cache
+    type: cache
+    instances: 2
+    region: us-east-1
+    metadata:
+      version: "7.0.5"
+      tier: high
+      sla_target: 99.9
+
+  - name: rabbitmq
+    type: queue
+    instances: 2
+    region: us-east-1
+    metadata:
+      version: "3.11.0"
+      tier: high
+      sla_target: 99.9
+
+dependencies:
+  # Gateway dependencies
+  - from: api-gateway
+    to: auth-service
+    type: http
+    critical: true
+
+  - from: api-gateway
+    to: user-service
+    type: http
+    critical: true
+
+  - from: api-gateway
+    to: order-service
+    type: http
+    critical: true
+
+  - from: api-gateway
+    to: redis-cache
+    type: cache
+    critical: false
+
+  # Service dependencies
+  - from: user-service
+    to: postgres-primary
+    type: database
+    critical: true
+
+  - from: user-service
+    to: redis-cache
+    type: cache
+    critical: false
+
+  - from: order-service
+    to: postgres-primary
+    type: database
+    critical: true
+
+  - from: order-service
+    to: inventory-service
+    type: http
+    critical: true
+
+  - from: order-service
+    to: payment-service
+    type: http
+    critical: true
+
+  - from: order-service
+    to: rabbitmq
+    type: queue
+    critical: false
+
+  - from: payment-service
+    to: postgres-primary
+    type: database
+    critical: true
+
+  - from: inventory-service
+    to: postgres-primary
+    type: database
+    critical: true
+
+  - from: inventory-service
+    to: redis-cache
+    type: cache
+    critical: true
+
+  - from: notification-worker
+    to: rabbitmq
+    type: queue
+    critical: true
+
+  - from: auth-service
+    to: postgres-primary
+    type: database
+    critical: true
+
+  - from: auth-service
+    to: redis-cache
+    type: cache
+    critical: true
+
