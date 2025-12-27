@@ -114,6 +114,37 @@ python -m cli.main generate --scenario latency_regression --output ./output
 }
 ```
 
+### Correlation ID Propagation
+
+Enable cross-signal correlation for RCA systems:
+
+```bash
+# Generate with correlation IDs (default 80% correlation density)
+python -m cli.main generate --scenario latency_regression --output ./output
+
+# Adjust correlation density (0.0 = no correlation, 1.0 = full correlation)
+python -m cli.main generate \
+  --scenario latency_regression \
+  --output ./output \
+  --correlation-density 0.9
+```
+
+**Benefits:**
+- Logs, metrics, and traces share correlation IDs
+- Track requests across service boundaries
+- Parent-child relationship modeling
+- Easier root cause analysis
+
+**Example:**
+```python
+# All telemetry for same event shares correlation_id
+log = {"correlation_id": "abc-123", "message": "Processing request"}
+metric = {"correlation_id": "abc-123", "value": 45.2}
+trace = {"correlation_id": "abc-123", "spans": [...]}
+```
+
+See `examples/correlation_example.py` for detailed usage.
+
 ## Incident Types
 
 ### 1. Latency Regression
