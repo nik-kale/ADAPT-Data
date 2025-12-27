@@ -82,6 +82,7 @@ def generate_incident(
     severity: str,
     difficulty: Optional[str] = None,
     streaming: bool = False,
+    correlation_density: float = 0.8,
     global_config: Optional[AdaptDataConfig] = None
 ) -> int:
     """Generate incident dataset.
@@ -93,6 +94,7 @@ def generate_incident(
         severity: Severity level
         difficulty: Difficulty level (beginner, easy, medium, hard, expert)
         streaming: Enable streaming output for large datasets
+        correlation_density: Correlation density for event correlation (0.0-1.0)
         global_config: Global ADAPT-Data configuration
 
     Returns:
@@ -199,11 +201,15 @@ def generate_incident(
                 severity=severity,
                 output_dir=output_dir_abs,
                 scenario_config=scenario_config,
-                streaming=streaming
+                streaming=streaming,
+                correlation_density=correlation_density
             )
 
             if streaming:
                 logger.info("Streaming mode enabled - using memory-efficient incremental writes")
+
+            if correlation_density != 0.8:
+                logger.info(f"Correlation density set to {correlation_density:.1%}")
 
             # Apply difficulty configuration if provided
             if difficulty:

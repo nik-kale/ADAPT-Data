@@ -72,6 +72,12 @@ def _main_impl() -> int:
         action="store_true",
         help="Enable streaming output for large datasets (reduces memory usage)"
     )
+    gen_parser.add_argument(
+        "--correlation-density",
+        type=float,
+        default=0.8,
+        help="Correlation density (0.0-1.0) for event correlation (default: 0.8)"
+    )
 
     # Validate command
     val_parser = subparsers.add_parser(
@@ -234,6 +240,7 @@ def _main_impl() -> int:
             severity=args.severity,
             difficulty=args.difficulty,
             streaming=args.streaming,
+            correlation_density=args.correlation_density,
             global_config=config
         )
     elif args.command == "validate":

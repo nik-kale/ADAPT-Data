@@ -11,6 +11,7 @@ from typing import Any, Callable, Optional
 
 from generator.core.utils import generate_uuid, timestamp_to_iso
 from generator.core.streaming import StreamingJSONLWriter
+from generator.core.correlation import CorrelationManager, CorrelatedEvent
 
 
 @dataclass
@@ -42,6 +43,7 @@ class IncidentContext:
     topology: dict[str, Any] = field(default_factory=dict)
     scenario_config: dict[str, Any] = field(default_factory=dict)
     streaming: bool = field(default=False)
+    correlation_density: float = field(default=0.8)
 
     def __post_init__(self) -> None:
         """Initialize computed fields."""
@@ -100,6 +102,9 @@ class BaseGenerator(ABC):
             context: Incident context
         """
         self.context = context
+        self.correlation_manager = CorrelationManager(
+            correlation_density=context.correlation_density
+        )
 
     @abstractmethod
     def generate(self) -> dict[str, Any]:
@@ -271,6 +276,94 @@ class BaseGenerator(ABC):
             True if a log should be generated
         """
         return random.random() < probability
+
+    def _create_correlated_event(
+        self,
+        timestamp: datetime,
+        service: str,
+        operation: str,
+        **attributes
+    ) -> CorrelatedEvent:
+        """Create a correlated event for telemetry generation.
+
+        Args:
+            timestamp: Event timestamp
+            service: Service name
+            operation: Operation name
+            **attributes: Additional event attributes
+
+        Returns:
+            CorrelatedEvent instance
+        """
+        return self.correlation_manager.create_event(
+            timestamp=timestamp,
+            service=service,
+            operation=operation,
+            **attributes
+        )
+
+    def _add_correlation_to_log(
+        self,
+        log: dict[str, Any],
+        event: CorrelatedEvent
+    ) -> dict[str, Any]:
+        """Add correlation fields to a log entry.
+
+        Args:
+            log: Log entry dictionary
+            event: Correlated event
+
+        Returns:
+            Log entry with correlation fields added
+        """
+        log.update(event.to_log_context())
+        return log
+
+    def _add_correlation_to_metric(
+        self,
+        metric: dict[str, Any],
+        event: CorrelatedEvent
+    ) -> dict[str, Any]:
+        """Add correlation fields to a metric.
+
+        Args:
+            metric: Metric dictionary
+            event: Correlated event
+
+        Returns:
+            Metric with correlation tags added
+        """
+        if "tags" not in metric:
+            metric["tags"] = {}
+
+        metric["tags"].update(event.to_metric_tags())
+        return metric
+
+    def _add_correlation_to_trace(
+        self,
+        trace: dict[str, Any],
+        event: CorrelatedEvent
+    ) -> dict[str, Any]:
+        """Add correlation fields to a trace.
+
+        Args:
+            trace: Trace dictionary
+            event: Correlated event
+
+        Returns:
+            Trace with correlation attributes added
+        """
+        # Add to trace level
+        trace["correlation_id"] = event.correlation_id
+        trace["request_id"] = event.request_id
+
+        # Add to all spans
+        for span in trace.get("spans", []):
+            if "attributes" not in span:
+                span["attributes"] = {}
+            span["attributes"].update(event.to_trace_attributes())
+
+        return trace
 
     def validate_output(self) -> dict[str, Any]:
         """Validate generated output data quality.
