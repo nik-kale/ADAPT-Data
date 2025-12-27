@@ -1,0 +1,61 @@
+type: database_deadlock
+description: Database deadlock with multi-table lock conflicts and transaction rollbacks
+
+parameters:
+  affected_service: order-service
+  database_service: postgres-primary
+  deadlock_frequency: 0.1
+  affected_tables:
+    - orders
+    - payments
+    - inventory
+
+metadata:
+  category: database_performance
+  severity_range: [SEV3, SEV2]
+  difficulty: medium
+
+  common_causes:
+    - Concurrent updates to multiple tables in different orders
+    - Missing or incorrect transaction isolation levels
+    - Long-running transactions holding locks
+    - High contention on popular rows
+    - Inefficient UPDATE/DELETE patterns
+
+  detection_signals:
+    - Lock wait timeout errors in application logs
+    - Transaction rollback rate spike
+    - PostgreSQL/MySQL deadlock detection logs
+    - Connection pool exhaustion warnings
+    - Increased lock conflicts metric
+    - Blocked query states in pg_stat_activity
+
+  investigation_steps:
+    - Check database error logs for deadlock details
+    - Analyze pg_stat_activity for blocked queries
+    - Review transaction patterns and lock acquisition order
+    - Identify tables with high lock contention
+    - Check for circular wait patterns in lock graph
+    - Review recent schema or query changes
+
+  mitigation_strategies:
+    - Ensure consistent lock acquisition order across transactions
+    - Reduce transaction duration and scope
+    - Add appropriate indexes to reduce lock duration
+    - Use SELECT FOR UPDATE SKIP LOCKED where applicable
+    - Implement retry logic with exponential backoff
+    - Consider table partitioning for high-contention tables
+    - Add explicit locking hints to queries
+
+  database_specific:
+    postgresql:
+      - Check pg_locks for waiting transactions
+      - Review log_lock_waits setting
+      - Enable deadlock_timeout logging
+      - Use pg_stat_statements to identify problematic queries
+    mysql:
+      - Check SHOW ENGINE INNODB STATUS for deadlock info
+      - Review innodb_lock_wait_timeout setting
+      - Enable innodb_print_all_deadlocks
+      - Use INFORMATION_SCHEMA.INNODB_TRX for transaction details
+
