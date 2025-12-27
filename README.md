@@ -4,13 +4,14 @@
 
 ## Features
 
-- 🎯 **7 Incident Types**: Latency regression, auth failures, dependency outages, config drift, packet loss, bursty noise, and memory leaks
+- 🎯 **8 Incident Types**: Latency regression, auth failures, dependency outages, config drift, packet loss, bursty noise, memory leaks, and database deadlocks
 - 📊 **Rich Telemetry**: Generates logs, metrics, traces, config changes, and incident timelines
 - 🔄 **Reproducible**: YAML-based scenario definitions for consistent dataset generation
 - ✅ **Schema-Validated**: JSON schemas for all data types with built-in validation
 - 🏗️ **Topology-Aware**: Service dependency graphs with realistic microservices architectures
 - 🚀 **Production-Quality**: Fully typed Python codebase with comprehensive error handling
 - 💾 **Streaming Mode**: Memory-efficient generation for large datasets (millions of records)
+- 🔗 **Correlation Support**: Cross-signal correlation with propagated correlation IDs
 
 ## Quick Start
 
@@ -181,6 +182,11 @@ Intermittent resource contention from noisy neighbors.
 Gradual memory exhaustion leading to OOM events.
 - **Signals**: Growing heap usage, increased GC pressure, container restarts
 - **Root Causes**: Unclosed connections, cache eviction failures, object retention
+
+### 8. Database Deadlock
+Multi-table lock conflicts causing transaction rollbacks.
+- **Signals**: Lock wait timeouts, transaction rollbacks, connection pool exhaustion
+- **Root Causes**: Concurrent updates in different orders, long-running transactions, high row contention
 
 ## Generated Data Structure
 
