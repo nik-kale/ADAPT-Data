@@ -22,6 +22,7 @@ class LoggingConfig(BaseModel):
     level: str = Field(default="INFO", description="Log level")
     enable_colors: bool = Field(default=True, description="Enable colored output")
     log_file: Optional[str] = Field(default=None, description="Log file path")
+    format: str = Field(default="text", description="Log output format: text or json")
 
 
 class GenerationConfig(BaseModel):
@@ -176,6 +177,11 @@ def _apply_env_overrides(config: AdaptDataConfig) -> None:
     if log_level := os.getenv("ADAPT_LOG_LEVEL"):
         config.logging.level = log_level.upper()
         logger.debug(f"Override log level from env: {config.logging.level}")
+
+    # Logging format
+    if log_format := os.getenv("ADAPT_LOG_FORMAT"):
+        config.logging.format = log_format.lower()
+        logger.debug(f"Override log format from env: {config.logging.format}")
 
     # Progress indicators
     if enable_progress := os.getenv("ADAPT_ENABLE_PROGRESS"):

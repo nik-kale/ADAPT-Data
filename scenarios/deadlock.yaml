@@ -1,0 +1,31 @@
+type: deadlock
+description: Concurrent transactions locking orders and inventory in opposing order
+
+parameters:
+  affected_service: order-service
+  database_service: postgres-primary
+  deadlock_frequency: 0.15
+  affected_tables:
+    - orders
+    - inventory
+  dialect: postgres
+  lock_timeout_ms: 5000.0
+  correlation_density: 0.8
+
+metadata:
+  category: database
+  common_causes:
+    - Transactions acquiring row locks in inconsistent order
+    - Worker concurrency raised without reviewing lock ordering
+    - Long-running transaction holding locks across a slow call
+    - Missing index forcing a lock escalation to range locks
+  detection_signals:
+    - Deadlock detector firing repeatedly (SQLSTATE 40P01 / MySQL 1213)
+    - Transaction rollback rate spiking in bursts
+    - Blocked session count rising with connection pool saturation
+    - Lock wait timeouts on a small set of tables
+  mitigation_strategies:
+    - Reduce worker concurrency to relieve contention
+    - Enforce a consistent lock ordering across transactions
+    - Shorten transaction scope so locks are held briefly
+    - Add retry-with-backoff around deadlock victim aborts

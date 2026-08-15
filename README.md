@@ -4,11 +4,14 @@
 
 ## Features
 
-- 🎯 **6 Incident Types**: Latency regression, auth failures, dependency outages, config drift, packet loss, and bursty noise
+- 🎯 **8 Incident Types**: Latency regression, auth failures, dependency outages, config drift, packet loss, bursty noise, memory leaks, and database deadlocks
 - 📊 **Rich Telemetry**: Generates logs, metrics, traces, config changes, and incident timelines
+- 🔗 **Correlated Signals**: Shared correlation IDs join logs, metrics, and traces for the same event
 - 🔄 **Reproducible**: YAML-based scenario definitions for consistent dataset generation
 - ✅ **Schema-Validated**: JSON schemas for all data types with built-in validation
-- 🏗️ **Topology-Aware**: Service dependency graphs with realistic microservices architectures
+- 🏗️ **Topology-Aware**: Built-in microservices graph, or define your own in YAML
+- 📈 **Ready to Visualize**: Grafana dashboards for every incident type, with a one-command stack
+- 📤 **Export Anywhere**: OpenTelemetry, Prometheus, and Datadog formats
 - 🚀 **Production-Quality**: Fully typed Python codebase with comprehensive error handling
 
 ## Quick Start
@@ -79,6 +82,16 @@ Intermittent resource contention from noisy neighbors.
 - **Signals**: Periodic CPU spikes, high latency variance
 - **Root Causes**: Batch jobs, scheduled tasks, other tenants
 
+### 7. Memory Leak
+Gradual heap exhaustion ending in an OOM kill.
+- **Signals**: Steadily rising heap with no plateau, GC pause and frequency climbing, throughput falling, exit code 137
+- **Root Causes**: Unbounded caches, unregistered listeners, retained buffers
+
+### 8. Database Deadlock
+Concurrent transactions locking tables in opposing order.
+- **Signals**: Deadlock detector firing (SQLSTATE 40P01 / MySQL 1213), rollback bursts, blocked sessions, pool saturation
+- **Root Causes**: Inconsistent lock ordering, raised concurrency, long transactions
+
 ## Generated Data Structure
 
 ```
@@ -122,6 +135,60 @@ Then generate:
 
 ```bash
 python -m cli.main generate --scenario my_custom_scenario --output ./output
+```
+
+## Custom Topologies
+
+Generate incidents against your own architecture instead of the built-in graph:
+
+```bash
+# Use a bundled topology
+python -m cli.main generate --scenario latency_regression \
+  --topology ecommerce --output ./output
+
+# Or your own YAML file
+python -m cli.main generate --scenario latency_regression \
+  --topology ./my-topology.yaml --output ./output
+```
+
+See [topology/README.md](topology/README.md) for the file format and bundled
+topologies.
+
+## Visualizing Incidents
+
+Grafana dashboards ship for every incident type:
+
+```bash
+# Replay a dataset as Prometheus metrics
+python -m cli.main serve ./output --port 9091 --replay-speed 60
+
+# Bring up Grafana + Prometheus with dashboards pre-provisioned
+docker compose -f dashboards/docker-compose.yml up
+# → http://localhost:3000
+```
+
+See [dashboards/README.md](dashboards/README.md) for details.
+
+## Exporting
+
+```bash
+# OpenTelemetry / Prometheus
+python -m cli.main export ./output --format opentelemetry --output otlp.json
+python -m cli.main export ./output --format prometheus --output metrics.txt
+
+# Datadog — metrics, logs and traces
+python -m cli.main export ./output --format datadog --dd-signal all --output ./dd
+```
+
+## Structured Logging
+
+For CI pipelines and log aggregation, emit machine-readable logs:
+
+```bash
+python -m cli.main --log-format json generate --scenario memory_leak --output ./output
+
+# Or via environment variable
+ADAPT_LOG_FORMAT=json python -m cli.main generate --scenario memory_leak --output ./output
 ```
 
 ## Integration with ADAPT Ecosystem

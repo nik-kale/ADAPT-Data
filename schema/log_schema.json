@@ -27,6 +27,10 @@
       "type": "string",
       "description": "Optional distributed trace ID"
     },
+    "correlation_id": {
+      "type": "string",
+      "description": "Optional ID joining this record to related metrics and traces"
+    },
     "span_id": {
       "type": "string",
       "description": "Optional span ID within a trace"

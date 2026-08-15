@@ -1,0 +1,163 @@
+name: saas-multitenant
+description: Multi-tenant SaaS control plane with async workers and analytics
+version: "1.0"
+
+services:
+  - name: load-balancer
+    type: gateway
+    instances: 2
+    region: us-west-2
+    metadata:
+      version: "1.4.0"
+      tier: critical
+      sla_target: 99.99
+    dependencies:
+      - target: app-server
+        type: http
+        critical: true
+
+  - name: app-server
+    type: api
+    instances: 12
+    region: us-west-2
+    metadata:
+      version: "7.3.2"
+      tier: critical
+      sla_target: 99.95
+    dependencies:
+      - target: identity-service
+        type: http
+        critical: true
+      - target: tenant-router
+        type: http
+        critical: true
+      - target: redis-cache
+        type: cache
+        critical: false
+
+  - name: identity-service
+    type: auth
+    instances: 4
+    region: us-west-2
+    metadata:
+      version: "3.0.0"
+      tier: critical
+      sla_target: 99.99
+    dependencies:
+      - target: postgres-shared
+        type: database
+        critical: true
+      - target: redis-cache
+        type: cache
+        critical: true
+
+  - name: tenant-router
+    type: api
+    instances: 4
+    region: us-west-2
+    metadata:
+      version: "2.2.1"
+      tier: critical
+      sla_target: 99.95
+    dependencies:
+      - target: postgres-shared
+        type: database
+        critical: true
+      - target: postgres-tenant
+        type: database
+        critical: true
+
+  - name: job-queue
+    type: queue
+    instances: 3
+    region: us-west-2
+    metadata:
+      version: "3.12.0"
+      tier: high
+      sla_target: 99.9
+
+  - name: async-worker
+    type: worker
+    instances: 8
+    region: us-west-2
+    metadata:
+      version: "4.1.0"
+      tier: high
+      sla_target: 99.5
+    dependencies:
+      - target: job-queue
+        type: queue
+        critical: true
+      - target: postgres-tenant
+        type: database
+        critical: true
+      - target: object-store
+        type: storage
+        critical: false
+
+  - name: analytics-ingest
+    type: worker
+    instances: 4
+    region: us-west-2
+    metadata:
+      version: "1.6.0"
+      tier: medium
+      sla_target: 99.0
+    dependencies:
+      - target: job-queue
+        type: queue
+        critical: true
+      - target: warehouse
+        type: storage
+        critical: true
+
+  - name: postgres-shared
+    type: database
+    instances: 1
+    region: us-west-2
+    metadata:
+      version: "15.4"
+      tier: critical
+      sla_target: 99.99
+
+  - name: postgres-tenant
+    type: database
+    instances: 4
+    region: us-west-2
+    metadata:
+      version: "15.4"
+      tier: critical
+      sla_target: 99.95
+
+  - name: redis-cache
+    type: cache
+    instances: 3
+    region: us-west-2
+    metadata:
+      version: "7.2.0"
+      tier: high
+      sla_target: 99.9
+
+  - name: object-store
+    type: storage
+    instances: 1
+    region: us-west-2
+    metadata:
+      version: "2024.1"
+      tier: high
+      sla_target: 99.99
+
+  - name: warehouse
+    type: storage
+    instances: 2
+    region: us-west-2
+    metadata:
+      version: "2024.1"
+      tier: medium
+      sla_target: 99.5
+
+dependencies:
+  - from: app-server
+    to: job-queue
+    type: queue
+    critical: false

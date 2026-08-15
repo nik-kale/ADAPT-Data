@@ -1,0 +1,354 @@
+{
+  "uid": "adapt-incident-overview",
+  "title": "ADAPT \u00b7 Incident Overview",
+  "description": "Golden signals across every ADAPT-Data incident type",
+  "tags": [
+    "adapt-data",
+    "incident",
+    "incident_overview"
+  ],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "10s",
+  "time": {
+    "from": "now-3h",
+    "to": "now"
+  },
+  "timezone": "utc",
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "adapt-prometheus"
+        },
+        "query": {
+          "query": "label_values(service)",
+          "refId": "adapt-services"
+        },
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "Incident window",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "adapt-prometheus"
+        },
+        "enable": true,
+        "iconColor": "red",
+        "expr": "ALERTS{alertstate=\"firing\"}"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Latency (p95)",
+      "description": "Golden signal: latency",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "adapt-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "adapt-prometheus"
+          },
+          "expr": "http_request_duration_p95{service=~\"$service\"}",
+          "legendFormat": "{{service}} \u00b7 {{host}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Error Rates",
+      "description": "Golden signal: errors",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "adapt-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "adapt-prometheus"
+          },
+          "expr": "http_error_rate{service=~\"$service\"}",
+          "legendFormat": "{{service}} \u00b7 {{host}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "adapt-prometheus"
+          },
+          "expr": "auth_error_rate{service=~\"$service\"}",
+          "legendFormat": "{{service}} \u00b7 {{host}}",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "adapt-prometheus"
+          },
+          "expr": "http_request_errors_percent{service=~\"$service\"}",
+          "legendFormat": "{{service}} \u00b7 {{host}}",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Traffic",
+      "description": "Golden signal: traffic",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "adapt-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "adapt-prometheus"
+          },
+          "expr": "http_requests_total{service=~\"$service\"}",
+          "legendFormat": "{{service}} \u00b7 {{host}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "adapt-prometheus"
+          },
+          "expr": "http_requests_per_second{service=~\"$service\"}",
+          "legendFormat": "{{service}} \u00b7 {{host}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Saturation",
+      "description": "Golden signal: saturation",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "adapt-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "adapt-prometheus"
+          },
+          "expr": "cpu_usage_percent{service=~\"$service\"}",
+          "legendFormat": "{{service}} \u00b7 {{host}}",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "adapt-prometheus"
+          },
+          "expr": "process_memory_utilization_percent{service=~\"$service\"}",
+          "legendFormat": "{{service}} \u00b7 {{host}}",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "adapt-prometheus"
+          },
+          "expr": "db_connection_pool_utilization_percent{service=~\"$service\"}",
+          "legendFormat": "{{service}} \u00b7 {{host}}",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Availability",
+      "description": "Hard failure signal",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "adapt-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "adapt-prometheus"
+          },
+          "expr": "service_available{service=~\"$service\"}",
+          "legendFormat": "{{service}} \u00b7 {{host}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    }
+  ]
+}

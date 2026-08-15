@@ -2,6 +2,7 @@
 """Main CLI entry point for ADAPT-Data."""
 
 import argparse
+import logging
 import sys
 from pathlib import Path
 
@@ -22,6 +23,11 @@ def _main_impl() -> int:
     parser = argparse.ArgumentParser(
         description="ADAPT-Data: Synthetic Telemetry & Incident Dataset Generator",
         formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--log-format",
+        choices=["text", "json"],
+        help="Log output format (default: text, or the ADAPT_LOG_FORMAT env var)"
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -56,6 +62,10 @@ def _main_impl() -> int:
         "--difficulty",
         choices=["beginner", "easy", "medium", "hard", "expert"],
         help="Challenge difficulty level (affects complexity, noise, correlations)"
+    )
+    gen_parser.add_argument(
+        "--topology",
+        help="Topology name (from topology/) or path to a topology YAML file"
     )
 
     # Validate command
@@ -112,12 +122,26 @@ def _main_impl() -> int:
     export_parser.add_argument(
         "--format",
         default=config.export.default_format,
-        help=f"Export format: opentelemetry, prometheus, or plugin name (default: {config.export.default_format})"
+        help=(
+            f"Export format: opentelemetry, prometheus, datadog, or plugin name "
+            f"(default: {config.export.default_format})"
+        )
     )
     export_parser.add_argument(
         "--output",
         required=True,
-        help="Output file path"
+        help="Output file path. For --format datadog with --dd-signal all, a directory."
+    )
+    export_parser.add_argument(
+        "--dd-signal",
+        choices=["metrics", "logs", "traces", "all"],
+        default="metrics",
+        help="Datadog signal to export (default: metrics)"
+    )
+    export_parser.add_argument(
+        "--dd-service-prefix",
+        default="",
+        help="Prefix added to service names, to keep synthetic data separable"
     )
 
     # Serve command (for Prometheus)
@@ -203,6 +227,22 @@ def _main_impl() -> int:
         help="Export results to JSON file"
     )
 
+    # Dashboards command
+    dashboards_parser = subparsers.add_parser(
+        "dashboards",
+        help="Export Grafana dashboard templates"
+    )
+    dashboards_parser.add_argument(
+        "--output",
+        default="./dashboards/grafana",
+        help="Directory to write dashboard JSON into (default: ./dashboards/grafana)"
+    )
+    dashboards_parser.add_argument(
+        "--datasource-uid",
+        default="adapt-prometheus",
+        help="Prometheus datasource UID referenced by the dashboards"
+    )
+
     # List plugins command
     list_plugins_parser = subparsers.add_parser(
         "list-plugins",
@@ -211,6 +251,17 @@ def _main_impl() -> int:
 
     args = parser.parse_args()
 
+    # Reconfigure logging before any command runs, so its output honours the
+    # requested format.
+    if args.log_format:
+        from generator.core.logging_config import setup_logging
+
+        setup_logging(
+            level=getattr(logging, config.logging.level, logging.INFO),
+            enable_colors=config.logging.enable_colors,
+            log_format=args.log_format,
+        )
+
     if args.command == "generate":
         return generate_incident(
             scenario=args.scenario,
@@ -218,7 +269,8 @@ def _main_impl() -> int:
             duration=args.duration,
             severity=args.severity,
             difficulty=args.difficulty,
-            global_config=config
+            global_config=config,
+            topology=args.topology
         )
     elif args.command == "validate":
         return validate_dataset(
@@ -258,6 +310,23 @@ def _main_impl() -> int:
             from generator.exporters.prometheus import PrometheusExporter
             exporter = PrometheusExporter(dataset_dir)
             exporter.export_text_format(Path(args.output))
+        elif args.format == "datadog":
+            from generator.exporters.datadog import DatadogExporter
+
+            dd_exporter = DatadogExporter(dataset_dir, service_prefix=args.dd_service_prefix)
+            try:
+                if args.dd_signal == "all":
+                    written = dd_exporter.export_all(Path(args.output))
+                    logger.info(f"Wrote {len(written)} Datadog payloads to {args.output}")
+                elif args.dd_signal == "logs":
+                    dd_exporter.export_logs(Path(args.output))
+                elif args.dd_signal == "traces":
+                    dd_exporter.export_traces(Path(args.output))
+                else:
+                    dd_exporter.export_metrics(Path(args.output))
+            except ValueError as e:
+                logger.error(f"Datadog export failed: {e}")
+                return 1
         else:
             # Try plugin exporters
             plugin_exporter = plugin_registry.get_exporter(args.format)
@@ -296,6 +365,12 @@ def _main_impl() -> int:
             with open(args.output, 'w') as f:
                 json.dump(results, f, indent=2)
             print(f"Results exported to: {args.output}")
+        return 0
+    elif args.command == "dashboards":
+        from generator.exporters.grafana import GrafanaDashboardBuilder
+
+        builder = GrafanaDashboardBuilder(datasource_uid=args.datasource_uid)
+        builder.export(Path(args.output))
         return 0
     elif args.command == "list-plugins":
         from generator.core.logging_config import get_logger

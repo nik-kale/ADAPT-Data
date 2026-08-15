@@ -188,6 +188,25 @@ class MemoryLeakInjector:
         self.max_memory_mb = max_memory_mb
         self.leak_start = leak_start or datetime.utcnow()
 
+    def get_projected_memory_usage(self, timestamp: datetime) -> float:
+        """Get the uncapped, noise-free memory projection for a timestamp.
+
+        This is the underlying leak curve, before the process memory limit is
+        applied. Use it to reason about *when* the limit is reached; use
+        :meth:`get_memory_usage` for the value an observer would actually see.
+
+        Args:
+            timestamp: Current timestamp
+
+        Returns:
+            Projected memory usage in MB (may exceed max_memory_mb)
+        """
+        if timestamp < self.leak_start:
+            return self.baseline_mb
+
+        elapsed_minutes = (timestamp - self.leak_start).total_seconds() / 60
+        return self.baseline_mb + self.leak_rate_mb_per_min * elapsed_minutes
+
     def get_memory_usage(self, timestamp: datetime) -> float:
         """Get memory usage for timestamp.
 
@@ -195,19 +214,14 @@ class MemoryLeakInjector:
             timestamp: Current timestamp
 
         Returns:
-            Memory usage in MB
+            Memory usage in MB, never above max_memory_mb
         """
-        if timestamp < self.leak_start:
-            return jitter(self.baseline_mb, 0.05)
+        projected = self.get_projected_memory_usage(timestamp)
 
-        # Calculate leaked amount
-        elapsed_minutes = (timestamp - self.leak_start).total_seconds() / 60
-        leaked = self.leak_rate_mb_per_min * elapsed_minutes
-
-        # Cap at max
-        memory = min(self.baseline_mb + leaked, self.max_memory_mb)
-
-        return jitter(memory, 0.05)
+        # Jitter the observable reading, then clamp: a process cannot report
+        # more than its memory limit, so noise must not push it past the cap.
+        observed = jitter(min(projected, self.max_memory_mb), 0.05)
+        return max(0.0, min(observed, self.max_memory_mb))
 
     def has_crashed(self, timestamp: datetime) -> bool:
         """Check if process has crashed due to OOM.
@@ -218,7 +232,10 @@ class MemoryLeakInjector:
         Returns:
             True if crashed
         """
-        return self.get_memory_usage(timestamp) >= self.max_memory_mb
+        # Compare against the uncapped projection so the verdict is stable:
+        # the observed reading is clamped to the cap and jittered, so it would
+        # only cross the threshold at random.
+        return self.get_projected_memory_usage(timestamp) >= self.max_memory_mb
 
 
 class CPUSpikeInjector:

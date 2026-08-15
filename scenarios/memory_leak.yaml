@@ -1,0 +1,28 @@
+type: memory_leak
+description: Unbounded cache growth exhausting the service heap until OOM kill
+
+parameters:
+  affected_service: order-service
+  initial_memory_mb: 512.0
+  leak_rate_mb_per_min: 25.0
+  max_memory_mb: 2048.0
+  restart_on_oom: true
+  correlation_density: 0.8
+
+metadata:
+  category: resource_exhaustion
+  common_causes:
+    - Unbounded in-memory cache with no eviction policy
+    - Listener or subscription never unregistered
+    - Connection or thread pool objects retained after use
+    - Large response buffers held past request completion
+  detection_signals:
+    - Steadily rising heap utilization with no plateau
+    - GC pause duration and frequency climbing together
+    - Throughput falling while request rate holds steady
+    - Container restart with exit code 137 (OOMKilled)
+  mitigation_strategies:
+    - Roll back the release that introduced the retention
+    - Restore cache entry TTL and size bounds
+    - Raise the container memory limit as a stopgap
+    - Capture a heap dump to identify retained objects

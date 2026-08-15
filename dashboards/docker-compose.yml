@@ -1,0 +1,41 @@
+# Grafana + Prometheus stack for viewing ADAPT-Data incidents.
+#
+#   1. adapt-data generate --scenario memory_leak --output ./out --duration 1h
+#   2. adapt-data serve ./out --port 9091 --replay-speed 60
+#   3. docker compose -f dashboards/docker-compose.yml up
+#   4. Open http://localhost:3000 (anonymous access, no login)
+#
+# Prometheus scrapes the replay server on the host, so `serve` must be running
+# for the panels to fill in.
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: adapt-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=24h
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./provisioning/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      # Lets Prometheus reach `adapt-data serve` running on the host.
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: adapt-grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_DEFAULT_THEME: dark
+    volumes:
+      - ./provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana:/var/lib/grafana/dashboards:ro

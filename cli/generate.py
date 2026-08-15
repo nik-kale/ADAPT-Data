@@ -16,7 +16,11 @@ from generator.core.config import AdaptDataConfig
 from generator.core.difficulty import DifficultyLevel, get_difficulty_config
 from generator.core.logging_config import get_logger
 from generator.core.progress import get_progress_tracker
-from generator.core.topology import TopologyGenerator
+from generator.core.topology import (
+    TopologyGenerator,
+    TopologyValidationError,
+    find_topology_file,
+)
 from generator.core.utils import parse_duration
 from generator.core.validation import validate_scenario_file, GenerationConfig
 from generator.incidents.latency_regression import LatencyRegressionGenerator
@@ -25,6 +29,8 @@ from generator.incidents.dependency_outage import DependencyOutageGenerator
 from generator.incidents.config_drift import ConfigDriftGenerator
 from generator.incidents.packet_loss import PacketLossGenerator
 from generator.incidents.bursty_noise import BurstyNoiseGenerator
+from generator.incidents.memory_leak import MemoryLeakGenerator
+from generator.incidents.deadlock import DeadlockGenerator
 from generator.incidents.cascade import CascadeGenerator
 
 logger = get_logger(__name__)
@@ -37,6 +43,8 @@ GENERATOR_MAP = {
     "config_drift": ConfigDriftGenerator,
     "packet_loss": PacketLossGenerator,
     "bursty_noise": BurstyNoiseGenerator,
+    "memory_leak": MemoryLeakGenerator,
+    "deadlock": DeadlockGenerator,
     "cascade": CascadeGenerator,
 }
 
@@ -79,7 +87,8 @@ def generate_incident(
     duration: str,
     severity: str,
     difficulty: Optional[str] = None,
-    global_config: Optional[AdaptDataConfig] = None
+    global_config: Optional[AdaptDataConfig] = None,
+    topology: Optional[str] = None
 ) -> int:
     """Generate incident dataset.
 
@@ -90,6 +99,8 @@ def generate_incident(
         severity: Severity level
         difficulty: Difficulty level (beginner, easy, medium, hard, expert)
         global_config: Global ADAPT-Data configuration
+        topology: Topology name or path. Overrides any topology named by the
+            scenario; falls back to the built-in default when neither is set.
 
     Returns:
         Exit code
@@ -212,9 +223,27 @@ def generate_incident(
 
         # Generate topology
         with tracker.track("Generating topology", total=1):
-            topo_gen = TopologyGenerator(context)
-            topology = topo_gen.generate()
-            context.topology = topology
+            # An explicit --topology beats the scenario's own choice.
+            topology_ref = topology or scenario_config.get("topology")
+
+            if topology_ref:
+                topology_path = find_topology_file(topology_ref)
+                if topology_path is None:
+                    logger.error(f"Topology not found: {topology_ref}")
+                    logger.info(
+                        "Provide a path to a YAML file, or a name from the topology/ directory"
+                    )
+                    return 1
+
+                try:
+                    topo_gen = TopologyGenerator.from_yaml(context, topology_path)
+                except TopologyValidationError as e:
+                    logger.error(f"Invalid topology {topology_path}: {e}")
+                    return 1
+            else:
+                topo_gen = TopologyGenerator(context)
+
+            context.topology = topo_gen.generate()
 
         # Get generator type
         generator_type = scenario_config.get("type")

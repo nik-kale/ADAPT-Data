@@ -9,6 +9,10 @@
       "type": "string",
       "description": "Unique trace identifier"
     },
+    "correlation_id": {
+      "type": "string",
+      "description": "Optional ID joining this trace to related logs and metrics"
+    },
     "spans": {
       "type": "array",
       "description": "List of spans in this trace",

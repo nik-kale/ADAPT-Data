@@ -2,6 +2,67 @@
 
 All notable changes to ADAPT-Data will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **Memory Leak Incident Type**: Gradual heap exhaustion ending in an OOM kill
+  - Steadily rising heap with correlated GC pause and frequency degradation
+  - Throughput decay as garbage collection takes CPU share
+  - OOM kill at the container limit with optional restart and heap reset
+  - Scenario: `scenarios/memory_leak.yaml`
+
+- **Database Deadlock Incident Type**: Cyclic lock contention between transactions
+  - Dialect-accurate errors for PostgreSQL (SQLSTATE 40P01) and MySQL (1213)
+  - Paired application-side rollbacks and database-side deadlock detection
+  - Blocked sessions, lock wait duration and connection pool saturation metrics
+  - Scenario: `scenarios/deadlock.yaml`
+
+- **Custom Topologies**: Define your own architecture in YAML
+  - `--topology <name|path>` on `generate`, or a `topology:` key in a scenario
+  - Bundled `ecommerce` and `saas-multitenant` topologies
+  - Dependencies declarable per-service or as a top-level edge list
+  - Validation catches unknown service types, duplicate names and dangling edges
+
+- **Datadog Exporter**: Third export target alongside OpenTelemetry and Prometheus
+  - Metrics (series API), logs (logs intake) and traces (APM) payloads
+  - `export --format datadog --dd-signal {metrics,logs,traces,all}`
+  - `--dd-service-prefix` keeps synthetic data separable from real telemetry
+  - Log `dd.trace_id` matches the APM span IDs, so logs and traces join
+
+- **Grafana Dashboards**: A dashboard per incident type, plus an overview
+  - `adapt-data dashboards` regenerates them from specs
+  - `docker compose -f dashboards/docker-compose.yml up` for a ready stack
+  - Panels carry a `service` template variable and are verified by tests to
+    reference only metrics the generators actually emit
+
+- **Structured JSON Logging**: Machine-readable output for CI and log aggregation
+  - `--log-format json` or `ADAPT_LOG_FORMAT=json`
+  - Stable fields plus source location, exceptions, and `extra=` context
+
+- **Correlation IDs**: Shared identifiers joining related telemetry
+  - One ID spans the log, metric and trace for an event; spans inherit it
+  - `correlation_density` controls what fraction of events are correlated
+  - Added to the log, metric and trace schemas
+
+- **Streaming JSONL Writer**: Constant-memory output for large datasets
+  - `StreamingJSONLWriter` and `BaseGenerator.stream_jsonl()`
+  - `stream_jsonl()` reader and `estimate_record_count()` helper
+
+### Fixed
+
+- **MemoryLeakInjector exceeded its memory cap**: jitter was applied after the
+  `max_memory_mb` clamp, so readings could exceed the limit, and `has_crashed()`
+  compared against that jittered value so its verdict flipped at random. Memory
+  is now clamped after jitter, and crash detection uses the uncapped projection.
+  Fixes two failing tests.
+- **INFO logs were silently dropped**: handlers were attached to the `adapt_data`
+  logger while modules log under `generator.*` / `cli.*`, which are not its
+  children, so only ERROR and above reached the terminal via the last-resort
+  handler. Handlers now go on the root logger.
+- Invalid `category` and `change_type` values in new generators' config deltas
+  now conform to `schema/config_delta_schema.json`.
+
 ## [0.4.0] - 2025-01-16
 
 ### Added - Advanced Features

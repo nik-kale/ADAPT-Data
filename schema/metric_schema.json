@@ -41,7 +41,7 @@
     },
     "tags": {
       "type": "object",
-      "description": "Metric tags/dimensions",
+      "description": "Metric tags/dimensions. May include correlation_id to join this sample to related logs and traces.",
       "additionalProperties": {"type": "string"}
     },
     "anomaly_injected": {

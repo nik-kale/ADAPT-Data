@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterable, Optional
 
 from generator.core.utils import generate_uuid, timestamp_to_iso
 
@@ -155,6 +155,41 @@ class BaseGenerator(ABC):
                 f.write(json.dumps(record, default=str) + '\n')
 
         return filepath
+
+    def stream_jsonl(
+        self,
+        records: Iterable[dict[str, Any]],
+        filename: str,
+        subdir: str = "",
+        buffer_size: int = 1000
+    ) -> tuple[Path, int]:
+        """Write records to a JSON Lines file without buffering them all.
+
+        The streaming counterpart to :meth:`save_jsonl`. Because ``records`` is
+        consumed lazily, a generator can produce millions of entries at flat
+        memory cost.
+
+        Args:
+            records: Records to write. Consumed lazily.
+            filename: Output filename
+            subdir: Optional subdirectory
+            buffer_size: Records held in memory between disk flushes
+
+        Returns:
+            Tuple of (path to saved file, number of records written)
+        """
+        from generator.core.streaming import StreamingJSONLWriter
+
+        output_path = self.context.output_dir
+        if subdir:
+            output_path = output_path / subdir
+
+        filepath = output_path / filename
+
+        with StreamingJSONLWriter(filepath, buffer_size=buffer_size) as writer:
+            count = writer.write_all(records)
+
+        return filepath, count
 
     def _get_service_hosts(self, service_name: str) -> list[str]:
         """Get list of host identifiers for a service.

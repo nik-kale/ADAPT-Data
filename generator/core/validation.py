@@ -95,6 +95,39 @@ class BurstyNoiseConfig(BaseModel):
     burst_duration_seconds: int = Field(30, gt=0, le=300)
 
 
+class MemoryLeakConfig(BaseModel):
+    """Configuration for memory leak incidents."""
+
+    affected_service: str = Field(..., min_length=1, max_length=100)
+    initial_memory_mb: float = Field(512.0, gt=0, le=1_048_576)
+    leak_rate_mb_per_min: float = Field(..., gt=0, le=100_000)
+    max_memory_mb: float = Field(..., gt=0, le=1_048_576)
+    restart_on_oom: bool = True
+    correlation_density: float = Field(0.8, ge=0.0, le=1.0)
+
+    @validator('max_memory_mb')
+    def max_must_exceed_initial(cls, v: float, values: dict[str, Any]) -> float:
+        """Ensure the memory limit is above the starting usage."""
+        initial = values.get('initial_memory_mb')
+        if initial is not None and v <= initial:
+            raise ValueError(
+                f"max_memory_mb ({v}) must be greater than initial_memory_mb ({initial})"
+            )
+        return v
+
+
+class DeadlockConfig(BaseModel):
+    """Configuration for database deadlock incidents."""
+
+    affected_service: str = Field(..., min_length=1, max_length=100)
+    database_service: str = Field("postgres-primary", min_length=1, max_length=100)
+    deadlock_frequency: float = Field(0.12, ge=0.0, le=1.0)
+    affected_tables: Optional[list[str]] = Field(None, min_length=2, max_length=10)
+    dialect: Literal["postgres", "mysql"] = "postgres"
+    lock_timeout_ms: float = Field(5000.0, gt=0, le=600_000)
+    correlation_density: float = Field(0.8, ge=0.0, le=1.0)
+
+
 class CascadeIncidentSpec(BaseModel):
     """Specification for a single incident in a cascade."""
 
@@ -104,7 +137,9 @@ class CascadeIncidentSpec(BaseModel):
         "dependency_outage",
         "config_drift",
         "packet_loss",
-        "bursty_noise"
+        "bursty_noise",
+        "memory_leak",
+        "deadlock"
     ]
     service: str = Field(..., min_length=1, max_length=100)
     delay: str = Field("0m", pattern=r'^\d+[smhd]$')
@@ -129,11 +164,26 @@ class ScenarioConfig(BaseModel):
         "config_drift",
         "packet_loss",
         "bursty_noise",
+        "memory_leak",
+        "deadlock",
         "cascade"
     ]
     description: str = Field(..., min_length=1, max_length=1000)
     parameters: dict[str, Any] = Field(default_factory=dict)
     metadata: Optional[dict[str, Any]] = None
+    topology: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=500,
+        description="Topology name or path used when --topology is not given"
+    )
+
+    @validator('topology')
+    def validate_topology_path(cls, v: Optional[str]) -> Optional[str]:
+        """Reject topology references that escape the project directory."""
+        if v is not None and ('..' in v or v.startswith('/')):
+            raise ValueError("Invalid topology path: path traversal not allowed")
+        return v
 
     @validator('parameters')
     def validate_parameters(cls, v: dict[str, Any], values: dict[str, Any]) -> dict[str, Any]:
@@ -157,6 +207,10 @@ class ScenarioConfig(BaseModel):
                 PacketLossConfig(**v)
             elif incident_type == "bursty_noise":
                 BurstyNoiseConfig(**v)
+            elif incident_type == "memory_leak":
+                MemoryLeakConfig(**v)
+            elif incident_type == "deadlock":
+                DeadlockConfig(**v)
             elif incident_type == "cascade":
                 CascadeConfig(**v)
         except Exception as e:
